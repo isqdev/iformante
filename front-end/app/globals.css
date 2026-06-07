@@ -1,0 +1,75 @@
+@import url("https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,400..700&display=swap");
+@import "tailwindcss";
+@import "@heroui/styles";
+
+html,
+body {
+  min-height: 100%;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: antialiased;
+  font-smooth: always;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  background: #fff;
+  color: var(--foreground);
+  font-family: "Google Sans Flex", "Google Sans", Arial, sans-serif;
+  font-size: 16px;
+}
+
+* {
+  box-sizing: border-box;
+  -moz-osx-font-smoothing: inherit;
+  -webkit-font-smoothing: inherit;
+  text-rendering: inherit;
+}
+
+.chat-sidebar {
+  background: #fff;
+  opacity: 1;
+}
+
+.chat-composer {
+  box-shadow: none !important;
+}
+
+.chat-response-spinner {
+  height: 1rem;
+  width: 1rem;
+}
+
+.chat-response-spinner svg {
+  animation: chat-spinner-rotate 0.8s linear infinite;
+  display: block;
+  height: 1rem;
+  width: 1rem;
+}
+
+@keyframes chat-spinner-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.chat-composer-textarea,
+.chat-composer-textarea *,
+.chat-composer textarea,
+.chat-composer-textarea textarea,
+textarea.chat-composer-textarea {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  resize: none !important;
+  overflow: hidden !important;
+}
+
+.chat-composer:focus-within {
+  box-shadow: none !important;
+}
+
+.chat-composer-textarea textarea {
+  padding: 0 !important;
+}
