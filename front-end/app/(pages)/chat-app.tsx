@@ -1,7 +1,8 @@
 "use client";
 
-import {startTransition, useState} from "react";
+import {startTransition, useEffect, useMemo, useState} from "react";
 import {Toast, useOverlayState} from "@heroui/react";
+import {useRouter} from "next/navigation";
 
 import {ChatInput} from "../components/ChatInput";
 import {ChatHeader} from "../components/ChatHeader";
@@ -13,32 +14,34 @@ import type {Conversation} from "../models/conversation";
 import type {Message} from "../models/message";
 import type {User} from "../models/user";
 
-const initialConversations: Conversation[] = [
-  {
-    id: "conv-1",
-    title: "Calendario academico 2026",
-    messages: [],
-  },
-  {
-    id: "conv-2",
-    title: "Bolsas e auxilios estudantis",
-    messages: [],
-  },
-  {
-    id: "conv-3",
-    title: "Atendimento da biblioteca",
-    messages: [],
-  },
-];
+type ChatAppProps = {
+  conversationId?: string;
+};
+
+type ConversationSummary = {
+  id: string;
+  title: string;
+};
+
+type ConversationPayload = ConversationSummary & {
+  messages: Message[];
+};
+
+type SseEvent = {
+  data: string;
+  event: string;
+};
 
 const currentUser: User = {
   name: "Isaque Dias",
   role: "Discente",
 };
 
-export function ChatApp() {
-  const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
-  const [activeConversationId, setActiveConversationId] = useState(initialConversations[0]?.id ?? "");
+export function ChatApp({conversationId}: ChatAppProps) {
+  const router = useRouter();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConversation, setActiveConversation] =
+    useState<Conversation | null>(null);
   const [draft, setDraft] = useState("");
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -49,105 +52,142 @@ export function ChatApp() {
   const settingsModal = useOverlayState();
   const documentModal = useOverlayState();
 
-  const activeConversation =
-    conversations.find((conversation) => conversation.id === activeConversationId) ??
-    conversations[0] ??
-    null;
-
   const canSend = draft.trim().length > 0;
+  const isNewConversationActive = !activeConversation?.id;
 
-  function handleNewConversation() {
-    const nextConversation: Conversation = {
-      id: `conv-${Date.now()}`,
-      title: `Nova conversa ${conversations.length + 1}`,
-      messages: [],
-    };
+  useEffect(() => {
+    void loadConversations();
+  }, []);
 
-    setConversations((current) => [nextConversation, ...current]);
-    setActiveConversationId(nextConversation.id);
-    setDraft("");
-    setIsMobileSidebarOpen(false);
+  useEffect(() => {
+    if (!conversationId) {
+      queueMicrotask(() => setActiveConversation(null));
+      return;
+    }
+
+    void loadConversation(conversationId);
+  }, [conversationId]);
+
+  const chatMessages = useMemo(
+    () => activeConversation?.messages ?? [],
+    [activeConversation],
+  );
+
+  async function loadConversations() {
+    const response = await fetch("/api/conversations", {cache: "no-store"});
+
+    if (!response.ok) {
+      setConversations([]);
+      return;
+    }
+
+    const payload = (await response.json()) as ConversationSummary[];
+    setConversations(
+      payload.map((conversation) => ({
+        ...conversation,
+        messages: [],
+      })),
+    );
   }
 
-  function handleSelectConversation(conversationId: string) {
-    setActiveConversationId(conversationId);
+  async function loadConversation(nextConversationId: string) {
+    const response = await fetch(`/api/conversations/${nextConversationId}`, {
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      setActiveConversation(null);
+      return;
+    }
+
+    const payload = (await response.json()) as ConversationPayload;
+    setActiveConversation(payload);
+    setConversations((current) => upsertConversation(current, payload));
+  }
+
+  function handleNewConversation() {
+    setActiveConversation(null);
+    setDraft("");
     setIsMobileSidebarOpen(false);
+    router.push("/");
+  }
+
+  function handleSelectConversation(nextConversationId: string) {
+    setIsMobileSidebarOpen(false);
+    router.push(`/c/${nextConversationId}`);
   }
 
   function updateAssistantMessage(
-    conversationId: string,
+    conversationIdToUpdate: string | null,
     messageId: string,
     content: string,
     isStreaming: boolean,
   ) {
     startTransition(() => {
-      setConversations((current) =>
-        current.map((conversation) =>
-          conversation.id === conversationId
-            ? {
-                ...conversation,
-                messages: conversation.messages.map((message) =>
-                  message.id === messageId
-                    ? {
-                        ...message,
-                        content,
-                        isStreaming,
-                      }
-                    : message,
-                ),
-              }
-            : conversation,
-        ),
-      );
+      setActiveConversation((current) => {
+        if (
+          !current ||
+          (current.id !== conversationIdToUpdate && current.id !== "")
+        ) {
+          return current;
+        }
+
+        return {
+          ...current,
+          messages: current.messages.map((message) =>
+            message.id === messageId
+              ? {
+                  ...message,
+                  content,
+                  isStreaming,
+                }
+              : message,
+          ),
+        };
+      });
     });
   }
 
   async function handleSendMessage() {
     const trimmedDraft = draft.trim();
 
-    if (!trimmedDraft || !activeConversation || isStreamingResponse) {
+    if (!trimmedDraft || isStreamingResponse) {
       return;
     }
 
-    const conversationId = activeConversation.id;
+    const existingConversationId = activeConversation?.id ?? null;
     const userMessage: Message = {
       id: `user-${Date.now()}`,
       role: "user",
       content: trimmedDraft,
     };
-
     const assistantMessage: Message = {
       id: `assistant-${Date.now() + 1}`,
       role: "assistant",
       content: "",
       isStreaming: true,
     };
+    const localConversation: Conversation = activeConversation
+      ? {
+          ...activeConversation,
+          messages: [
+            ...activeConversation.messages,
+            userMessage,
+            assistantMessage,
+          ],
+        }
+      : {
+          id: "",
+          title: trimmedDraft.slice(0, 48),
+          messages: [userMessage, assistantMessage],
+        };
 
-    const nextMessages = [...activeConversation.messages, userMessage, assistantMessage];
-    const messagesForModel = [...activeConversation.messages, userMessage]
-      .filter((message) => message.content.trim().length > 0)
-      .map((message) => ({
-        role: message.role,
-        content: message.content.trim(),
-      }));
-
-    setConversations((current) =>
-      current.map((conversation) =>
-        conversation.id === conversationId
-          ? {
-              ...conversation,
-              title:
-                conversation.messages.length === 0
-                  ? trimmedDraft.slice(0, 48)
-                  : conversation.title,
-              messages: nextMessages,
-            }
-          : conversation,
-      ),
-    );
-
+    setActiveConversation(localConversation);
     setDraft("");
     setIsStreamingResponse(true);
+
+    let resolvedConversationId = existingConversationId;
+    let assistantContent = "";
 
     try {
       const response = await fetch("/api/chat", {
@@ -156,7 +196,8 @@ export function ChatApp() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          messages: messagesForModel,
+          conversation_id: existingConversationId,
+          message: trimmedDraft,
         }),
       });
 
@@ -172,7 +213,7 @@ export function ChatApp() {
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let assistantContent = "";
+      let buffer = "";
 
       while (true) {
         const {done, value} = await reader.read();
@@ -181,32 +222,128 @@ export function ChatApp() {
           break;
         }
 
-        assistantContent += decoder.decode(value, {stream: true});
-        updateAssistantMessage(
-          conversationId,
-          assistantMessage.id,
-          assistantContent,
-          true,
-        );
+        buffer += decoder.decode(value, {stream: true});
+        const result = processSseBuffer(buffer, (event) => {
+          const nextConversationId = handleSseEvent({
+            assistantMessageId: assistantMessage.id,
+            currentAssistantContent: assistantContent,
+            event,
+            fallbackTitle: trimmedDraft,
+            resolvedConversationId,
+          });
+
+          if (event.event === "delta") {
+            const payload = JSON.parse(event.data) as {content?: string};
+            assistantContent += payload.content ?? "";
+          }
+
+          if (nextConversationId) {
+            resolvedConversationId = nextConversationId;
+          }
+        });
+        buffer = result;
       }
 
-      assistantContent += decoder.decode();
+      buffer += decoder.decode();
+      processSseBuffer(buffer, (event) => {
+        const nextConversationId = handleSseEvent({
+          assistantMessageId: assistantMessage.id,
+          currentAssistantContent: assistantContent,
+          event,
+          fallbackTitle: trimmedDraft,
+          resolvedConversationId,
+        });
+
+        if (event.event === "delta") {
+          const payload = JSON.parse(event.data) as {content?: string};
+          assistantContent += payload.content ?? "";
+        }
+
+        if (nextConversationId) {
+          resolvedConversationId = nextConversationId;
+        }
+      });
+
       updateAssistantMessage(
-        conversationId,
+        resolvedConversationId,
         assistantMessage.id,
         assistantContent,
         false,
       );
+      void loadConversations();
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
           : "Nao foi possivel obter resposta da IA.";
 
-      updateAssistantMessage(conversationId, assistantMessage.id, message, false);
+      updateAssistantMessage(
+        resolvedConversationId,
+        assistantMessage.id,
+        message,
+        false,
+      );
     } finally {
       setIsStreamingResponse(false);
     }
+  }
+
+  function handleSseEvent({
+    assistantMessageId,
+    currentAssistantContent,
+    event,
+    fallbackTitle,
+    resolvedConversationId,
+  }: {
+    assistantMessageId: string;
+    currentAssistantContent: string;
+    event: SseEvent;
+    fallbackTitle: string;
+    resolvedConversationId: string | null;
+  }): string | null {
+    if (event.event === "conversation") {
+      const payload = JSON.parse(event.data) as {
+        conversation_id: string;
+        title: string;
+      };
+
+      setActiveConversation((current) => {
+        const nextConversation: Conversation = {
+          id: payload.conversation_id,
+          title: payload.title || fallbackTitle.slice(0, 48),
+          messages: current?.messages ?? [],
+        };
+
+        setConversations((items) => upsertConversation(items, nextConversation));
+        return nextConversation;
+      });
+
+      if (!resolvedConversationId) {
+        window.history.replaceState(null, "", `/c/${payload.conversation_id}`);
+      }
+
+      return payload.conversation_id;
+    }
+
+    if (event.event === "delta") {
+      const payload = JSON.parse(event.data) as {content?: string};
+      const nextContent = currentAssistantContent + (payload.content ?? "");
+
+      updateAssistantMessage(
+        resolvedConversationId,
+        assistantMessageId,
+        nextContent,
+        true,
+      );
+    }
+
+    if (event.event === "error") {
+      const payload = JSON.parse(event.data) as {message?: string};
+
+      throw new Error(payload.message ?? "Erro ao gerar resposta.");
+    }
+
+    return null;
   }
 
   return (
@@ -218,6 +355,7 @@ export function ChatApp() {
           currentUser={currentUser}
           isCollapsed={isSidebarCollapsed}
           isMobileOpen={isMobileSidebarOpen}
+          isNewConversationActive={isNewConversationActive}
           onCloseMobile={() => setIsMobileSidebarOpen(false)}
           onNewDocument={documentModal.open}
           onNewConversation={handleNewConversation}
@@ -233,9 +371,9 @@ export function ChatApp() {
           />
 
           <section className="flex min-h-0 flex-1 flex-col">
-            {activeConversation && activeConversation.messages.length > 0 ? (
+            {chatMessages.length > 0 ? (
               <>
-                <ChatMessages messages={activeConversation.messages} />
+                <ChatMessages messages={chatMessages} />
 
                 <div className="px-4 py-4 md:px-6">
                   <ChatInput
@@ -252,7 +390,7 @@ export function ChatApp() {
                 <div className="w-full max-w-3xl">
                   <div className="mb-10 text-center">
                     <h1 className="text-3xl font-semibold">
-                      Qual a sua dúvida sobre o IF?
+                      Qual a sua duvida sobre o IF?
                     </h1>
                   </div>
 
@@ -275,4 +413,66 @@ export function ChatApp() {
       <Toast.Provider placement="top end" />
     </>
   );
+}
+
+function upsertConversation(
+  conversations: Conversation[],
+  conversation: Conversation,
+) {
+  const existingConversation = conversations.find(
+    (item) => item.id === conversation.id,
+  );
+
+  if (!existingConversation) {
+    return [conversation, ...conversations];
+  }
+
+  return conversations.map((item) =>
+    item.id === conversation.id
+      ? {
+          ...item,
+          ...conversation,
+          messages:
+            conversation.messages.length > 0
+              ? conversation.messages
+              : item.messages,
+        }
+      : item,
+  );
+}
+
+function processSseBuffer(
+  buffer: string,
+  onEvent: (event: SseEvent) => void,
+) {
+  const blocks = buffer.split("\n\n");
+  const nextBuffer = blocks.pop() ?? "";
+
+  for (const block of blocks) {
+    const event = parseSseEvent(block);
+
+    if (event) {
+      onEvent(event);
+    }
+  }
+
+  return nextBuffer;
+}
+
+function parseSseEvent(block: string): SseEvent | null {
+  const eventLine = block
+    .split("\n")
+    .find((line) => line.startsWith("event: "));
+  const dataLine = block
+    .split("\n")
+    .find((line) => line.startsWith("data: "));
+
+  if (!eventLine || !dataLine) {
+    return null;
+  }
+
+  return {
+    event: eventLine.slice("event: ".length),
+    data: dataLine.slice("data: ".length),
+  };
 }
