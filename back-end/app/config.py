@@ -10,13 +10,23 @@ load_dotenv()
 @dataclass(frozen=True)
 class Settings:
     openai_api_key: str | None
+
     openai_model: str
+
     openai_embedding_model: str
+
     openai_embedding_dimensions: int
+
     qdrant_url: str | None
+
     qdrant_api_key: str | None
+
     qdrant_collection: str
+
     rag_top_k: int
+
+    chat_history_limit: int
+
     database_url: str | None
 
     @staticmethod
@@ -35,6 +45,7 @@ class Settings:
             qdrant_api_key=os.getenv("QDRANT_API_KEY"),
             qdrant_collection=os.getenv("QDRANT_COLLECTION", "my-collection"),
             rag_top_k=int(os.getenv("RAG_TOP_K", "4")),
+            chat_history_limit=int(os.getenv("CHAT_HISTORY_LIMIT", "12")),
             database_url=Settings._normalize_database_url(os.getenv("DATABASE_URL")),
         )
 

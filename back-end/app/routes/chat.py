@@ -1,5 +1,8 @@
 import json
+import logging
 from collections.abc import AsyncIterator
+from functools import lru_cache
+from time import perf_counter
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -16,8 +19,10 @@ from model.chat import ChatMessage, SendMessageRequest
 ANONYMOUS_COOKIE_NAME = "iformante_anonymous_id"
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
+@lru_cache(maxsize=1)
 def get_chat_domain() -> ChatDomain:
     return ChatDomain(
         api_key=settings.openai_api_key,
@@ -86,6 +91,8 @@ async def send_message(
 
     async def stream_response() -> AsyncIterator[str]:
         assistant_content = ""
+        started_at = perf_counter()
+        first_token_logged = False
 
         try:
             conversation = await conversation_domain.create_or_get_conversation(
@@ -93,13 +100,21 @@ async def send_message(
                 anonymous_id,
                 message,
             )
-            previous_messages = await conversation_domain.list_messages(conversation.id)
+            previous_messages = await conversation_domain.list_recent_messages(
+                conversation.id,
+                settings.chat_history_limit,
+            )
             user_message = await conversation_domain.create_user_message(
                 conversation.id,
                 message,
             )
             await conversation_domain.touch_conversation(conversation)
             await conversation_domain.commit()
+            logger.info(
+                "chat.db_elapsed_ms=%s conversation_id=%s",
+                round((perf_counter() - started_at) * 1000),
+                conversation.id,
+            )
 
             yield format_sse(
                 "conversation",
@@ -120,6 +135,13 @@ async def send_message(
             model_messages.append(ChatMessage(role="user", content=message))
 
             async for chunk in chat_domain.stream_response(model_messages):
+                if not first_token_logged:
+                    first_token_logged = True
+                    logger.info(
+                        "chat.first_token_elapsed_ms=%s conversation_id=%s",
+                        round((perf_counter() - started_at) * 1000),
+                        conversation.id,
+                    )
                 assistant_content += chunk
                 yield format_sse("delta", {"content": chunk})
 
@@ -129,6 +151,11 @@ async def send_message(
             )
             await conversation_domain.touch_conversation(conversation)
             await conversation_domain.commit()
+            logger.info(
+                "chat.total_elapsed_ms=%s conversation_id=%s",
+                round((perf_counter() - started_at) * 1000),
+                conversation.id,
+            )
             yield format_sse(
                 "done",
                 {

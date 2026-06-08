@@ -30,6 +30,16 @@ class ConversationDomain:
     async def list_messages(self, conversation_id: str) -> list[Message]:
         return await self._message_repository.list_by_conversation(conversation_id)
 
+    async def list_recent_messages(
+        self,
+        conversation_id: str,
+        limit: int,
+    ) -> list[Message]:
+        return await self._message_repository.list_recent_by_conversation(
+            conversation_id,
+            limit,
+        )
+
     async def create_or_get_conversation(
         self,
         conversation_id: str | None,

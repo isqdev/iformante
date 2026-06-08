@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 from langchain_core.vectorstores import VectorStoreRetriever
 from langchain_openai import OpenAIEmbeddings
 from langchain_qdrant import FastEmbedSparse, QdrantVectorStore, RetrievalMode
@@ -18,6 +20,7 @@ SPARSE_MODEL_NAME = "Qdrant/bm25"
 TOP_K_DEFAULT = 10
 
 
+@lru_cache(maxsize=1)
 def build_qdrant_client() -> QdrantClient:
     if not settings.qdrant_url:
         raise RuntimeError("QDRANT_URL nao configurada no back-end.")
@@ -28,6 +31,7 @@ def build_qdrant_client() -> QdrantClient:
     )
 
 
+@lru_cache(maxsize=1)
 def build_dense_embeddings() -> OpenAIEmbeddings:
     if not settings.openai_api_key:
         raise RuntimeError("OPENAI_API_KEY nao configurada no back-end.")
@@ -39,6 +43,7 @@ def build_dense_embeddings() -> OpenAIEmbeddings:
     )
 
 
+@lru_cache(maxsize=1)
 def build_sparse_embeddings() -> FastEmbedSparse:
     return FastEmbedSparse(model_name=SPARSE_MODEL_NAME)
 
@@ -83,6 +88,7 @@ def ensure_qdrant_collection(client: QdrantClient) -> None:
         )
 
 
+@lru_cache(maxsize=1)
 def build_qdrant_vector_store() -> QdrantVectorStore:
     client = build_qdrant_client()
     ensure_qdrant_collection(client)
@@ -98,6 +104,7 @@ def build_qdrant_vector_store() -> QdrantVectorStore:
     )
 
 
+@lru_cache(maxsize=16)
 def build_qdrant_retriever(top_k: int | None = None) -> VectorStoreRetriever:
     vector_store = build_qdrant_vector_store()
 

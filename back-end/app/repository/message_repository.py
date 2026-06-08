@@ -23,3 +23,18 @@ class MessageRepository:
             .order_by(Message.created_at.asc()),
         )
         return list(result.scalars().all())
+
+    async def list_recent_by_conversation(
+        self,
+        conversation_id: str,
+        limit: int,
+    ) -> list[Message]:
+        result = await self._session.execute(
+            select(Message)
+            .where(Message.conversation_id == conversation_id)
+            .order_by(Message.created_at.desc())
+            .limit(limit),
+        )
+        messages = list(result.scalars().all())
+        messages.reverse()
+        return messages
