@@ -1,22 +1,14 @@
 import {NextResponse} from "next/server";
 
-type ChatRequestMessage = {
-  content: string;
-  role: "assistant" | "user";
-};
-
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8000";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const backendUrl = process.env.BACKEND_API_URL ?? DEFAULT_BACKEND_URL;
-  const {messages} = (await request.json()) as {messages?: ChatRequestMessage[]};
-  const sanitizedMessages = (messages ?? []).filter(
-    (message) => message.content.trim().length > 0,
-  );
+  const payload = await request.json().catch(() => null);
 
-  if (sanitizedMessages.length === 0) {
+  if (!payload?.message || typeof payload.message !== "string") {
     return NextResponse.json(
       {error: "Nenhuma mensagem foi enviada."},
       {status: 400},
@@ -30,8 +22,15 @@ export async function POST(request: Request) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Cookie: request.headers.get("cookie") ?? "",
       },
-      body: JSON.stringify({messages: sanitizedMessages}),
+      body: JSON.stringify({
+        conversation_id:
+          typeof payload.conversation_id === "string"
+            ? payload.conversation_id
+            : null,
+        message: payload.message,
+      }),
     });
   } catch {
     return NextResponse.json(
@@ -50,22 +49,30 @@ export async function POST(request: Request) {
           | {detail?: string; error?: string}
           | null)
       : null;
-    const errorText = errorPayload?.detail ?? errorPayload?.error ?? (await upstreamResponse.text().catch(() => ""));
+    const errorText =
+      errorPayload?.detail ??
+      errorPayload?.error ??
+      (await upstreamResponse.text().catch(() => ""));
 
     return NextResponse.json(
       {
-        error:
-          errorText ||
-          "Nao foi possivel obter resposta do back-end.",
+        error: errorText || "Nao foi possivel obter resposta do back-end.",
       },
       {status: upstreamResponse.status || 500},
     );
   }
 
+  const responseHeaders = new Headers({
+    "Content-Type": "text/event-stream; charset=utf-8",
+    "Cache-Control": "no-cache, no-transform",
+  });
+  const setCookie = upstreamResponse.headers.get("set-cookie");
+
+  if (setCookie) {
+    responseHeaders.set("Set-Cookie", setCookie);
+  }
+
   return new Response(upstreamResponse.body, {
-    headers: {
-      "Content-Type": "text/plain; charset=utf-8",
-      "Cache-Control": "no-cache, no-transform",
-    },
+    headers: responseHeaders,
   });
 }

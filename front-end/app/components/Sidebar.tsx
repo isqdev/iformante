@@ -12,6 +12,7 @@ type SidebarProps = {
   currentUser: User;
   isCollapsed: boolean;
   isMobileOpen: boolean;
+  isNewConversationActive: boolean;
   onCloseMobile: () => void;
   onNewDocument: () => void;
   onNewConversation: () => void;
@@ -26,6 +27,7 @@ export function Sidebar({
   currentUser,
   isCollapsed,
   isMobileOpen,
+  isNewConversationActive,
   onCloseMobile,
   onNewDocument,
   onNewConversation,
@@ -70,7 +72,7 @@ export function Sidebar({
                 fullWidth
                 className={"justify-start text-foreground " + (isCollapsed ? "md:h-10 md:w-10 md:min-w-10 md:justify-center md:px-0" : "")}
                 size="sm"
-                variant="ghost"
+                variant={isNewConversationActive ? "tertiary" : "ghost"}
                 onPress={onNewConversation}
               >
                 <span
@@ -201,7 +203,7 @@ export function Sidebar({
             fullWidth
             className="justify-start text-foreground"
             size="sm"
-            variant="ghost"
+            variant={isNewConversationActive ? "tertiary" : "ghost"}
             onPress={onNewConversation}
           >
             <span className="flex min-w-0 items-center gap-2">
