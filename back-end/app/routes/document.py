@@ -8,8 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.db import get_database_session
 from app.domains.document import DocumentDomain
-from app.use_cases import IngestDocumentUseCase
-from model.document import DownloadDocumentRequest, DownloadDocumentResponse
+from app.use_cases import DeleteDocumentUseCase, IngestDocumentUseCase
+from model.document import (
+    DeleteDocumentResponse,
+    DownloadDocumentRequest,
+    DownloadDocumentResponse,
+)
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -22,6 +26,13 @@ def get_ingest_document_use_case() -> IngestDocumentUseCase:
         qdrant_collection=settings.qdrant_collection,
         embedding_model=settings.openai_embedding_model,
         embedding_dimensions=settings.openai_embedding_dimensions,
+    )
+
+
+def get_delete_document_use_case() -> DeleteDocumentUseCase:
+    return DeleteDocumentUseCase(
+        qdrant_url=settings.qdrant_url,
+        qdrant_collection=settings.qdrant_collection,
     )
 
 
@@ -79,4 +90,31 @@ async def download_document(
         filename=result.filename,
         path=str(Path(result.path).resolve()),
         chunks_indexed=result.chunks_indexed,
+    )
+
+
+@router.delete("/{document_id}", response_model=DeleteDocumentResponse)
+async def delete_document(
+    document_id: str,
+    use_case: Annotated[
+        DeleteDocumentUseCase,
+        Depends(get_delete_document_use_case),
+    ],
+) -> DeleteDocumentResponse:
+    try:
+        result = await use_case.execute(document_id)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(error),
+        ) from error
+
+    return DeleteDocumentResponse(
+        document_id=result.document_id,
+        deleted=True,
     )
