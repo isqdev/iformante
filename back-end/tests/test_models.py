@@ -9,10 +9,10 @@ from app.security import hash_password, verify_password
 
 
 class ModelTests(unittest.TestCase):
-    def test_generate_id_returns_nine_alphanumeric_characters(self) -> None:
+    def test_generate_id_returns_five_alphanumeric_characters(self) -> None:
         generated_id = generate_id()
 
-        self.assertEqual(len(generated_id), 9)
+        self.assertEqual(len(generated_id), 5)
         self.assertTrue(
             all(character in string.ascii_letters + string.digits for character in generated_id),
         )
@@ -38,6 +38,7 @@ class ModelTests(unittest.TestCase):
         self.assertIsInstance(documents_table.columns["ingestion_status"].type, String)
         self.assertIsInstance(messages_table.columns["author"].type, String)
 
+
     def test_password_hash_can_be_verified(self) -> None:
         password = "senha-segura-123"
 
@@ -53,6 +54,7 @@ class ModelTests(unittest.TestCase):
         self.assertIn("anonymous_id", conversations_table.columns)
         self.assertTrue(conversations_table.columns["user_id"].nullable)
         self.assertTrue(conversations_table.columns["anonymous_id"].nullable)
+        self.assertEqual(conversations_table.columns["anonymous_id"].type.length, 9)
 
     def test_database_url_is_normalized_for_asyncpg(self) -> None:
         database_url = Settings._normalize_database_url(

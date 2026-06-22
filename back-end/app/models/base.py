@@ -6,7 +6,7 @@ from sqlalchemy import MetaData
 from sqlalchemy.orm import DeclarativeBase
 
 ID_ALPHABET = string.ascii_letters + string.digits
-ID_LENGTH = 9
+ID_LENGTH = 5
 
 
 def generate_id() -> str:

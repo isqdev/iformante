@@ -11,6 +11,12 @@ class DownloadDocumentResponse(BaseModel):
     chunks_indexed: int
 
 
+class DocumentResponse(BaseModel):
+    id: str
+    name: str
+    url: str
+
+
 class DeleteDocumentResponse(BaseModel):
     document_id: str
     deleted: bool

@@ -6,7 +6,7 @@ from app.models import Conversation, Message, MessageAuthor
 from app.repository import ConversationRepository, MessageRepository
 
 
-class ConversationDomain:
+class ConversationManager:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
         self._conversation_repository = ConversationRepository(session)

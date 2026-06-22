@@ -1,45 +1,36 @@
-from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from httpx import HTTPError, HTTPStatusError
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.config import settings
-from app.db import get_database_session
-from app.domains.document import DocumentDomain
-from app.use_cases import DeleteDocumentUseCase, IngestDocumentUseCase
-from model.document import (
+from app.factories.documents import (
+    get_delete_document_use_case,
+    get_document_manager,
+    get_ingest_document_use_case,
+)
+from app.schemas import (
     DeleteDocumentResponse,
+    DocumentResponse,
     DownloadDocumentRequest,
     DownloadDocumentResponse,
 )
+from app.use_cases import DeleteDocumentUseCase, DocumentManager, IngestDocumentUseCase
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
 
-def get_ingest_document_use_case() -> IngestDocumentUseCase:
-    return IngestDocumentUseCase(
-        openai_api_key=settings.openai_api_key,
-        qdrant_url=settings.qdrant_url,
-        qdrant_api_key=settings.qdrant_api_key,
-        qdrant_collection=settings.qdrant_collection,
-        embedding_model=settings.openai_embedding_model,
-        embedding_dimensions=settings.openai_embedding_dimensions,
-    )
-
-
-def get_delete_document_use_case() -> DeleteDocumentUseCase:
-    return DeleteDocumentUseCase(
-        qdrant_url=settings.qdrant_url,
-        qdrant_collection=settings.qdrant_collection,
-    )
-
-
-def get_document_domain(
-    session: Annotated[AsyncSession, Depends(get_database_session)],
-) -> DocumentDomain:
-    return DocumentDomain(session)
+@router.get("", response_model=list[DocumentResponse])
+async def list_documents(
+    document_manager: Annotated[DocumentManager, Depends(get_document_manager)],
+) -> list[DocumentResponse]:
+    documents = await document_manager.list_documents()
+    return [
+        DocumentResponse(
+            id=document.id,
+            name=document.file_name or document.title,
+            url=document.source_url,
+        )
+        for document in documents
+    ]
 
 
 @router.post("/download", response_model=DownloadDocumentResponse)
@@ -49,7 +40,7 @@ async def download_document(
         IngestDocumentUseCase,
         Depends(get_ingest_document_use_case),
     ],
-    document_domain: Annotated[DocumentDomain, Depends(get_document_domain)],
+    document_domain: Annotated[DocumentManager, Depends(get_document_manager)],
 ) -> DownloadDocumentResponse:
     document = await document_domain.create_processing_document(payload.url.strip())
 
@@ -58,7 +49,7 @@ async def download_document(
         await document_domain.mark_document_indexed(
             document,
             result.filename,
-            result.path,
+            result.storage_url,
             result.chunks_indexed,
         )
     except ValueError as error:
@@ -88,7 +79,7 @@ async def download_document(
 
     return DownloadDocumentResponse(
         filename=result.filename,
-        path=str(Path(result.path).resolve()),
+        path=result.storage_url,
         chunks_indexed=result.chunks_indexed,
     )
 

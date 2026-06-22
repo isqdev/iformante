@@ -9,7 +9,7 @@ from app.repository import DocumentRepository
 HARDCODED_DOCUMENT_UPLOADER_ID = "isaque123"
 
 
-class DocumentDomain:
+class DocumentManager:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
         self._document_repository = DocumentRepository(session)
@@ -28,15 +28,25 @@ class DocumentDomain:
         await self._session.commit()
         return document
 
+    async def list_documents(self) -> list[Document]:
+        return await self._document_repository.list_all()
+
+    async def get_document(self, document_id: str) -> Document | None:
+        return await self._document_repository.get_by_id(document_id)
+
+    async def delete_document(self, document: Document) -> None:
+        await self._document_repository.delete(document)
+        await self._session.commit()
+
     async def mark_document_indexed(
         self,
         document: Document,
         file_name: str,
-        stored_path: Path,
+        stored_path: str,
         total_chunks: int,
     ) -> None:
         document.file_name = file_name
-        document.stored_path = str(stored_path)
+        document.stored_path = stored_path
         document.total_chunks = total_chunks
         document.ingestion_status = IngestionStatus.INDEXED.value
         await self._session.commit()

@@ -33,7 +33,7 @@ class Conversation(Base):
     )
 
     anonymous_id: Mapped[str | None] = mapped_column(
-        String(64),
+        String(9),
         nullable=True,
     )
 

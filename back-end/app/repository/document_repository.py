@@ -16,6 +16,16 @@ class DocumentRepository:
     async def get_by_id(self, document_id: str) -> Document | None:
         return await self._session.get(Document, document_id)
 
+    async def list_all(self) -> list[Document]:
+        result = await self._session.execute(
+            select(Document).order_by(Document.created_at.desc()),
+        )
+        return list(result.scalars().all())
+
+    async def delete(self, document: Document) -> None:
+        await self._session.delete(document)
+        await self._session.flush()
+
     async def list_by_uploader(self, user_id: str) -> list[Document]:
         result = await self._session.execute(
             select(Document)

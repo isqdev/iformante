@@ -26,7 +26,6 @@ class SendMessageRequest(BaseModel):
                 ),
                 None,
             )
-
             if last_user_message:
                 return last_user_message.content.strip()
 

@@ -19,7 +19,6 @@ RUN uv sync --frozen --no-dev
 COPY . .
 
 RUN useradd --create-home --shell /usr/sbin/nologin appuser \
-    && mkdir -p /app/downloads \
     && chown -R appuser:appuser /app
 
 USER appuser

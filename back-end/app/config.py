@@ -29,6 +29,12 @@ class Settings:
 
     database_url: str | None
 
+    cloudinary_cloud_name: str | None
+
+    cloudinary_api_key: str | None
+
+    cloudinary_api_secret: str | None
+
     @staticmethod
     def from_env() -> "Settings":
         return Settings(
@@ -44,9 +50,12 @@ class Settings:
             qdrant_url=os.getenv("QDRANT_URL"),
             qdrant_api_key=os.getenv("QDRANT_API_KEY"),
             qdrant_collection=os.getenv("QDRANT_COLLECTION", "my-collection"),
-            rag_top_k=int(os.getenv("RAG_TOP_K", "4")),
+            rag_top_k=int(os.getenv("RAG_TOP_K", "8")),
             chat_history_limit=int(os.getenv("CHAT_HISTORY_LIMIT", "12")),
             database_url=Settings._normalize_database_url(os.getenv("DATABASE_URL")),
+            cloudinary_cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+            cloudinary_api_key=os.getenv("CLOUDINARY_API_KEY"),
+            cloudinary_api_secret=os.getenv("CLOUDINARY_API_SECRET"),
         )
 
     @staticmethod

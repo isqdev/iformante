@@ -1,9 +1,23 @@
-from .delete_document import DeleteDocumentUseCase
-from .download_document import DownloadDocumentUseCase
-from .ingest_document import IngestDocumentUseCase
+from .chat import (
+    ChatStreamEvent,
+    ConversationManager,
+    ReceiveMessageUseCase,
+    ReplyMessageUseCase,
+    BuscarDocumentos,
+    RouteOrRetrieveMessageResult,
+    RouteOrRetrieveMessageUseCase,
+)
+from .documents import DeleteDocumentUseCase, DocumentManager, IngestDocumentUseCase
 
 __all__ = [
+    "ChatStreamEvent",
+    "ConversationManager",
     "DeleteDocumentUseCase",
-    "DownloadDocumentUseCase",
+    "DocumentManager",
     "IngestDocumentUseCase",
+    "ReceiveMessageUseCase",
+    "ReplyMessageUseCase",
+    "RouteOrRetrieveMessageResult",
+    "RouteOrRetrieveMessageUseCase",
+    "BuscarDocumentos",
 ]

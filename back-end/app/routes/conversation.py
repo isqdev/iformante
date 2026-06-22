@@ -1,32 +1,20 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.db import get_database_session
-from app.domains.conversation import ConversationDomain
+from app.factories.chat import get_conversation_manager
 from app.models import MessageAuthor
 from app.routes.chat import get_or_create_anonymous_id, set_anonymous_cookie
-from model.conversation import (
-    ConversationResponse,
-    ConversationSummaryResponse,
-    MessageResponse,
-)
+from app.schemas import ConversationResponse, ConversationSummaryResponse, MessageResponse
+from app.use_cases import ConversationManager
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
-
-
-def get_conversation_domain(
-    session: Annotated[AsyncSession, Depends(get_database_session)],
-) -> ConversationDomain:
-    return ConversationDomain(session)
 
 
 @router.get("", response_model=list[ConversationSummaryResponse])
 async def list_conversations(
     request: Request,
     response: Response,
-    conversation_domain: Annotated[ConversationDomain, Depends(get_conversation_domain)],
+    conversation_domain: Annotated[ConversationManager, Depends(get_conversation_manager)],
 ) -> list[ConversationSummaryResponse]:
     anonymous_id, should_set_cookie = get_or_create_anonymous_id(request)
 
@@ -49,7 +37,7 @@ async def get_conversation(
     conversation_id: str,
     request: Request,
     response: Response,
-    conversation_domain: Annotated[ConversationDomain, Depends(get_conversation_domain)],
+    conversation_domain: Annotated[ConversationManager, Depends(get_conversation_manager)],
 ) -> ConversationResponse:
     anonymous_id, should_set_cookie = get_or_create_anonymous_id(request)
 
