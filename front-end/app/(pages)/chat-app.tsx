@@ -1,29 +1,24 @@
 "use client";
 
 import {startTransition, useEffect, useMemo, useState} from "react";
-import {Toast, useOverlayState} from "@heroui/react";
 import {useRouter} from "next/navigation";
+import {Toast} from "@heroui/react";
 
 import {ChatInput} from "../components/ChatInput";
 import {ChatHeader} from "../components/ChatHeader";
 import {ChatMessages} from "../components/ChatMessages";
-import {DocumentModal} from "../components/DocumentModal";
-import {SettingsModal} from "../components/SettingsModal";
-import {Sidebar} from "../components/Sidebar";
+import {ChatSkeleton} from "../components/Skelentons";
+import {useSidebar} from "../components/sidebar/SidebarProvider";
 import type {Conversation} from "../models/conversation";
-import type {Message} from "../models/message";
-import type {User} from "../models/user";
+import type {Message, MessageSource} from "../models/message";
 
 type ChatAppProps = {
   conversationId?: string;
 };
 
-type ConversationSummary = {
+type ConversationPayload = {
   id: string;
   title: string;
-};
-
-type ConversationPayload = ConversationSummary & {
   messages: Message[];
 };
 
@@ -32,96 +27,99 @@ type SseEvent = {
   event: string;
 };
 
-const currentUser: User = {
-  name: "Isaque Dias",
-  role: "Discente",
-};
-
 export function ChatApp({conversationId}: ChatAppProps) {
   const router = useRouter();
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const {
+    openMobileSidebar,
+    refreshConversations,
+    setActiveConversationId,
+    newConversationVersion,
+  } = useSidebar();
   const [activeConversation, setActiveConversation] =
     useState<Conversation | null>(null);
   const [draft, setDraft] = useState("");
-
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-
+  const [isLoadingConversation, setIsLoadingConversation] = useState(
+    Boolean(conversationId),
+  );
   const [isStreamingResponse, setIsStreamingResponse] = useState(false);
 
-  const settingsModal = useOverlayState();
-  const documentModal = useOverlayState();
-
   const canSend = draft.trim().length > 0;
-  const isNewConversationActive = !activeConversation?.id;
-
-  useEffect(() => {
-    void loadConversations();
-  }, []);
 
   useEffect(() => {
     if (!conversationId) {
-      queueMicrotask(() => setActiveConversation(null));
+      queueMicrotask(() => {
+        setActiveConversation(null);
+        setIsLoadingConversation(false);
+      });
       return;
     }
 
-    void loadConversation(conversationId);
-  }, [conversationId]);
+    let isCancelled = false;
+    queueMicrotask(() => {
+      if (!isCancelled) {
+        setIsLoadingConversation(true);
+      }
+    });
+
+    void (async () => {
+      try {
+        const response = await fetch(`/api/conversations/${conversationId}`, {
+          cache: "no-store",
+        });
+
+        if (isCancelled) {
+          return;
+        }
+
+        if (!response.ok) {
+          setActiveConversation(null);
+          router.replace("/");
+          Toast.toast.warning("Chat não encontrado");
+          return;
+        }
+
+        const payload = (await response.json()) as ConversationPayload;
+
+        if (!isCancelled) {
+          setActiveConversation(payload);
+        }
+      } catch {
+        if (!isCancelled) {
+          setActiveConversation(null);
+          router.replace("/");
+          Toast.toast.warning("Chat não encontrado");
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingConversation(false);
+        }
+      }
+    })();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [conversationId, router]);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      setActiveConversation(null);
+      setDraft("");
+      setIsLoadingConversation(false);
+    });
+  }, [newConversationVersion]);
 
   const chatMessages = useMemo(
     () => activeConversation?.messages ?? [],
     [activeConversation],
   );
 
-  async function loadConversations() {
-    const response = await fetch("/api/conversations", {cache: "no-store"});
-
-    if (!response.ok) {
-      setConversations([]);
-      return;
-    }
-
-    const payload = (await response.json()) as ConversationSummary[];
-    setConversations(
-      payload.map((conversation) => ({
-        ...conversation,
-        messages: [],
-      })),
-    );
-  }
-
-  async function loadConversation(nextConversationId: string) {
-    const response = await fetch(`/api/conversations/${nextConversationId}`, {
-      cache: "no-store",
-    });
-
-    if (!response.ok) {
-      setActiveConversation(null);
-      return;
-    }
-
-    const payload = (await response.json()) as ConversationPayload;
-    setActiveConversation(payload);
-    setConversations((current) => upsertConversation(current, payload));
-  }
-
-  function handleNewConversation() {
-    setActiveConversation(null);
-    setDraft("");
-    setIsMobileSidebarOpen(false);
-    router.push("/");
-  }
-
-  function handleSelectConversation(nextConversationId: string) {
-    setIsMobileSidebarOpen(false);
-    router.push(`/c/${nextConversationId}`);
-  }
-
   function updateAssistantMessage(
     conversationIdToUpdate: string | null,
     messageId: string,
     content: string,
     isStreaming: boolean,
+    sources?: MessageSource[],
   ) {
     startTransition(() => {
       setActiveConversation((current) => {
@@ -140,6 +138,7 @@ export function ChatApp({conversationId}: ChatAppProps) {
                   ...message,
                   content,
                   isStreaming,
+                  sources: sources ?? message.sources,
                 }
               : message,
           ),
@@ -148,8 +147,8 @@ export function ChatApp({conversationId}: ChatAppProps) {
     });
   }
 
-  async function handleSendMessage() {
-    const trimmedDraft = draft.trim();
+  async function handleSendMessage(message?: string) {
+    const trimmedDraft = (message ?? draft).trim();
 
     if (!trimmedDraft || isStreamingResponse) {
       return;
@@ -157,12 +156,12 @@ export function ChatApp({conversationId}: ChatAppProps) {
 
     const existingConversationId = activeConversation?.id ?? null;
     const userMessage: Message = {
-      id: `user-${Date.now()}`,
+      id: createTemporaryMessageId("user"),
       role: "user",
       content: trimmedDraft,
     };
     const assistantMessage: Message = {
-      id: `assistant-${Date.now() + 1}`,
+      id: createTemporaryMessageId("assistant"),
       role: "assistant",
       content: "",
       isStreaming: true,
@@ -270,7 +269,7 @@ export function ChatApp({conversationId}: ChatAppProps) {
         assistantContent,
         false,
       );
-      void loadConversations();
+      void refreshConversations();
     } catch (error) {
       const message =
         error instanceof Error
@@ -314,9 +313,9 @@ export function ChatApp({conversationId}: ChatAppProps) {
           messages: current?.messages ?? [],
         };
 
-        setConversations((items) => upsertConversation(items, nextConversation));
         return nextConversation;
       });
+      setActiveConversationId(payload.conversation_id);
 
       if (!resolvedConversationId) {
         window.history.replaceState(null, "", `/c/${payload.conversation_id}`);
@@ -339,106 +338,82 @@ export function ChatApp({conversationId}: ChatAppProps) {
 
     if (event.event === "error") {
       const payload = JSON.parse(event.data) as {message?: string};
+      const errorMessage = payload.message ?? "Erro ao gerar resposta.";
 
-      throw new Error(payload.message ?? "Erro ao gerar resposta.");
+      if (errorMessage.toLocaleLowerCase("pt-BR").includes("conversa nao encontrada")) {
+        router.replace("/");
+        Toast.toast.warning("Chat não encontrado");
+      }
+
+      throw new Error(errorMessage);
+    }
+
+    if (event.event === "done") {
+      const payload = JSON.parse(event.data) as {sources?: MessageSource[]};
+
+      updateAssistantMessage(
+        resolvedConversationId,
+        assistantMessageId,
+        currentAssistantContent,
+        false,
+        payload.sources ?? [],
+      );
     }
 
     return null;
   }
 
   return (
-    <>
-      <div className="flex h-screen overflow-hidden bg-white text-foreground">
-        <Sidebar
-          activeConversationId={activeConversation?.id ?? ""}
-          conversations={conversations}
-          currentUser={currentUser}
-          isCollapsed={isSidebarCollapsed}
-          isMobileOpen={isMobileSidebarOpen}
-          isNewConversationActive={isNewConversationActive}
-          onCloseMobile={() => setIsMobileSidebarOpen(false)}
-          onNewDocument={documentModal.open}
-          onNewConversation={handleNewConversation}
-          onOpenSettings={settingsModal.open}
-          onSelectConversation={handleSelectConversation}
-          onToggleCollapse={() => setIsSidebarCollapsed((current) => !current)}
-        />
+    <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-white">
+      <ChatHeader
+        isLoading={isLoadingConversation}
+        title={activeConversation?.title ?? ""}
+        onOpenMobileSidebar={openMobileSidebar}
+      />
 
-        <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-white">
-          <ChatHeader
-            title={activeConversation?.title ?? "Nova conversa"}
-            onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
-          />
+      <section className="flex min-h-0 flex-1 flex-col">
+        {isLoadingConversation ? (
+          <ChatSkeleton />
+        ) : chatMessages.length > 0 ? (
+          <>
+            <ChatMessages messages={chatMessages} />
 
-          <section className="flex min-h-0 flex-1 flex-col">
-            {chatMessages.length > 0 ? (
-              <>
-                <ChatMessages messages={chatMessages} />
-
-                <div className="px-4 py-4 md:px-6">
-                  <ChatInput
-                    canSend={canSend}
-                    draft={draft}
-                    isStreaming={isStreamingResponse}
-                    onDraftChange={setDraft}
-                    onSend={handleSendMessage}
-                  />
-                </div>
-              </>
-            ) : (
-              <div className="flex flex-1 flex-col items-center justify-center px-4 py-8 md:px-6">
-                <div className="w-full max-w-3xl">
-                  <div className="mb-10 text-center">
-                    <h1 className="text-3xl font-semibold">
-                      Qual a sua duvida sobre o IF?
-                    </h1>
-                  </div>
-
-                  <ChatInput
-                    canSend={canSend}
-                    draft={draft}
-                    isStreaming={isStreamingResponse}
-                    onDraftChange={setDraft}
-                    onSend={handleSendMessage}
-                  />
-                </div>
+            <div className="px-4 py-4 md:px-6">
+              <ChatInput
+                canSend={canSend}
+                draft={draft}
+                isStreaming={isStreamingResponse}
+                onDraftChange={setDraft}
+                onSend={handleSendMessage}
+              />
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-1 flex-col items-center justify-center px-4 py-8 md:px-6">
+            <div className="w-full max-w-3xl">
+              <div className="mb-10 text-center">
+                <h1 className="text-3xl font-semibold">
+                  Pergunte sobre o IF!
+                </h1>
               </div>
-            )}
-          </section>
-        </main>
 
-        <DocumentModal state={documentModal} />
-        <SettingsModal state={settingsModal} user={currentUser} />
-      </div>
-      <Toast.Provider placement="top end" />
-    </>
+              <ChatInput
+                canSend={canSend}
+                draft={draft}
+                isStreaming={isStreamingResponse}
+                onDraftChange={setDraft}
+                onSend={handleSendMessage}
+              />
+            </div>
+          </div>
+        )}
+      </section>
+    </main>
   );
 }
 
-function upsertConversation(
-  conversations: Conversation[],
-  conversation: Conversation,
-) {
-  const existingConversation = conversations.find(
-    (item) => item.id === conversation.id,
-  );
-
-  if (!existingConversation) {
-    return [conversation, ...conversations];
-  }
-
-  return conversations.map((item) =>
-    item.id === conversation.id
-      ? {
-          ...item,
-          ...conversation,
-          messages:
-            conversation.messages.length > 0
-              ? conversation.messages
-              : item.messages,
-        }
-      : item,
-  );
+function createTemporaryMessageId(role: "assistant" | "user") {
+  return `${role}-${crypto.randomUUID()}`;
 }
 
 function processSseBuffer(

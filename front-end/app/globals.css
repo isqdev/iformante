@@ -2,6 +2,19 @@
 @import "tailwindcss";
 @import "@heroui/styles";
 
+:root,
+.light,
+.default,
+[data-theme="light"],
+[data-theme="default"] {
+  --accent: oklch(0.7805 0.1226 156.45);
+}
+
+.dark,
+[data-theme="dark"] {
+  --accent: #a1bc98;
+}
+
 html,
 body {
   min-height: 100%;
@@ -33,24 +46,6 @@ body {
 
 .chat-composer {
   box-shadow: none !important;
-}
-
-.chat-response-spinner {
-  height: 1rem;
-  width: 1rem;
-}
-
-.chat-response-spinner svg {
-  animation: chat-spinner-rotate 0.8s linear infinite;
-  display: block;
-  height: 1rem;
-  width: 1rem;
-}
-
-@keyframes chat-spinner-rotate {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .chat-composer-textarea,

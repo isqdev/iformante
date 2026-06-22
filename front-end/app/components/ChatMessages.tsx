@@ -1,7 +1,10 @@
 "use client";
 
 import {useEffect, useRef} from "react";
-import {ScrollShadow, Spinner} from "@heroui/react";
+import {FileText} from "@gravity-ui/icons";
+import {Button, ScrollShadow} from "@heroui/react";
+import {Bouncy} from "ldrs/react";
+import "ldrs/react/Bouncy.css";
 
 import type {Message} from "../models/message";
 import {ParseMarkdown} from "./ParseMarkdown";
@@ -54,13 +57,37 @@ export function ChatMessages({messages}: ChatMessagesProps) {
                 <span
                   className={"flex items-center text-foreground " + (message.content ? "mt-3" : "")}
                 >
-                  <Spinner
+                  <Bouncy
                     aria-label="Gerando resposta"
-                    className="chat-response-spinner"
-                    color="accent"
-                    size="sm"
+                    color="var(--accent)"
+                    size="24"
+                    speed="1.75"
                   />
                 </span>
+              ) : null}
+              {message.role === "assistant" &&
+              !message.isStreaming &&
+              message.sources?.length ? (
+                <div className="mt-6">
+                  <hr className="mb-4 border-default" />
+                  <p className="mb-3 font-medium">Fontes:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {message.sources.map((source) => (
+                      <Button
+                        key={source.url || source.filename}
+                        onPress={() =>
+                          window.open(source.url, "_blank", "noopener,noreferrer")
+                        }
+                        variant="secondary"
+                      >
+                        <FileText className="h-4 w-4 shrink-0" />
+                        <span className="min-w-0 truncate">
+                          {source.filename}
+                        </span>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
               ) : null}
             </div>
           </article>

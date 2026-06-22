@@ -1,20 +1,23 @@
 "use client";
 
-import {FaceRobot, FilePlus, LayoutSideContentLeft, Pencil} from "@gravity-ui/icons";
+import {FaceRobot, File, FilePlus, LayoutSideContentLeft, Pencil} from "@gravity-ui/icons";
 import {Avatar, Button, ScrollShadow} from "@heroui/react";
 
-import type {Conversation} from "../models/conversation";
-import type {User} from "../models/user";
+import {SidebarSkeleton} from "../Skelentons";
+import type {Conversation} from "../../models/conversation";
+import type {User} from "../../models/user";
 
 type SidebarProps = {
   activeConversationId: string;
   conversations: Conversation[];
   currentUser: User;
   isCollapsed: boolean;
+  isLoadingConversations: boolean;
   isMobileOpen: boolean;
   isNewConversationActive: boolean;
   onCloseMobile: () => void;
   onNewDocument: () => void;
+  onOpenDocuments: () => void;
   onNewConversation: () => void;
   onOpenSettings: () => void;
   onSelectConversation: (conversationId: string) => void;
@@ -26,10 +29,12 @@ export function Sidebar({
   conversations,
   currentUser,
   isCollapsed,
+  isLoadingConversations,
   isMobileOpen,
   isNewConversationActive,
   onCloseMobile,
   onNewDocument,
+  onOpenDocuments,
   onNewConversation,
   onOpenSettings,
   onSelectConversation,
@@ -94,14 +99,29 @@ export function Sidebar({
                 variant="ghost"
                 onPress={onNewDocument}
               >
+                <span className={"flex min-w-0 items-center gap-2 " + (isCollapsed ? "md:w-full md:justify-center md:gap-0" : "")}>
+                  <FilePlus className="h-4 w-4 shrink-0" />
+                  <span className={"overflow-hidden whitespace-nowrap text-sm transition-[opacity,transform,width] duration-200 " + labelState}>
+                    Novo documento
+                  </span>
+                </span>
+              </Button>
+
+              <Button
+                fullWidth
+                className={"justify-start text-foreground " + (isCollapsed ? "md:h-10 md:w-10 md:min-w-10 md:justify-center md:px-0" : "")}
+                size="sm"
+                variant="ghost"
+                onPress={onOpenDocuments}
+              >
                 <span
                   className={"flex min-w-0 items-center gap-2 " + (isCollapsed ? "md:w-full md:justify-center md:gap-0" : "")}
                 >
-                  <FilePlus className="h-4 w-4 shrink-0" />
+                  <File className="h-4 w-4 shrink-0" />
                   <span
                     className={"overflow-hidden whitespace-nowrap text-sm transition-[opacity,transform,width] duration-200 " + labelState}
                   >
-                    Novo documento
+                    Documentos
                   </span>
                 </span>
               </Button>
@@ -117,7 +137,9 @@ export function Sidebar({
               className={"min-h-0 flex-1 pb-3 transition-opacity duration-200 " + (isCollapsed ? "px-2 md:pointer-events-none md:hidden md:opacity-0" : "px-3 opacity-100")}
             >
               <div className="space-y-1">
-                {conversations.map((conversation) => {
+                {isLoadingConversations ? (
+                  <SidebarSkeleton />
+                ) : conversations.map((conversation) => {
                   const isActive = conversation.id === activeConversationId;
 
                   return (
@@ -174,6 +196,7 @@ export function Sidebar({
           >
             <LayoutSideContentLeft className="h-4 w-4" />
           </Button>
+
         </div>
       </div>
 
@@ -196,6 +219,7 @@ export function Sidebar({
           >
             <LayoutSideContentLeft className="h-4 w-4" />
           </Button>
+
         </div>
 
         <div className="space-y-1 px-3 pb-4 pt-3">
@@ -223,8 +247,21 @@ export function Sidebar({
           >
             <span className="flex min-w-0 items-center gap-2">
               <FilePlus className="h-4 w-4 shrink-0" />
+              <span className="overflow-hidden whitespace-nowrap text-sm">Novo documento</span>
+            </span>
+          </Button>
+
+          <Button
+            fullWidth
+            className="justify-start text-foreground"
+            size="sm"
+            variant="ghost"
+            onPress={onOpenDocuments}
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              <File className="h-4 w-4 shrink-0" />
               <span className="overflow-hidden whitespace-nowrap text-sm">
-                Novo documento
+                Documentos
               </span>
             </span>
           </Button>
@@ -236,7 +273,9 @@ export function Sidebar({
 
         <ScrollShadow className="min-h-0 flex-1 px-3 pb-3">
           <div className="space-y-1">
-            {conversations.map((conversation) => {
+            {isLoadingConversations ? (
+              <SidebarSkeleton />
+            ) : conversations.map((conversation) => {
               const isActive = conversation.id === activeConversationId;
 
               return (

@@ -2,6 +2,27 @@ import {NextResponse} from "next/server";
 
 const backendUrl = process.env.BACKEND_API_URL ?? "http://127.0.0.1:8000";
 
+export async function GET() {
+  try {
+    const response = await fetch(`${backendUrl}/documents`, {cache: "no-store"});
+    const payload = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      return NextResponse.json(
+        {error: payload?.detail ?? "Não foi possível carregar os documentos."},
+        {status: response.status},
+      );
+    }
+
+    return NextResponse.json(payload);
+  } catch {
+    return NextResponse.json(
+      {error: "Não foi possível conectar ao back-end."},
+      {status: 502},
+    );
+  }
+}
+
 export async function POST(request: Request) {
   const payload = await request.json().catch(() => null);
 
@@ -27,7 +48,7 @@ export async function POST(request: Request) {
         | null;
 
       return NextResponse.json(
-        {error: errorPayload?.detail ?? "Nao foi possivel baixar o documento."},
+        {error: errorPayload?.detail ?? "Nao foi possivel processar o documento."},
         {status: response.status},
       );
     }

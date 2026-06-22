@@ -37,16 +37,16 @@ export function DocumentModal({state}: DocumentModalProps) {
           | {error?: string}
           | null;
 
-        throw new Error(payload?.error ?? "Nao foi possivel baixar o documento.");
+        throw new Error(payload?.error ?? "Nao foi possivel processar o documento.");
       }
 
       state.close();
-      Toast.toast.success("Documento baixado com sucesso.");
+      Toast.toast.success("Documento enviado com sucesso.");
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
-          : "Nao foi possivel baixar o documento.";
+          : "Nao foi possivel processar o documento.";
 
       Toast.toast.danger(message);
     } finally {
@@ -96,7 +96,7 @@ export function DocumentModal({state}: DocumentModalProps) {
 
             {isSubmitting ? (
               <div className="mt-5 flex justify-center">
-                <Spinner aria-label="Baixando documento" color="accent" size="sm" />
+                <Spinner aria-label="Enviando documento" color="accent" size="sm" />
               </div>
             ) : null}
           </Modal.Dialog>
