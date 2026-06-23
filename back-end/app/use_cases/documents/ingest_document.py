@@ -257,12 +257,6 @@ class IngestDocumentUseCase:
         return secure_url
 
     def _extract_document(self, document_path: Path, content_type: str) -> ExtractedDocument:
-        with document_path.open("rb") as document_file:
-            signature = document_file.read(5)
-
-        if signature != b"%PDF-":
-            raise ValueError("Apenas documentos PDF sao aceitos.")
-
         return self._extract_pdf_document(document_path)
 
     def _extract_pdf_document(self, document_path: Path) -> ExtractedDocument:
