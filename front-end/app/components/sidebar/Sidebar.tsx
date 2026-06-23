@@ -1,6 +1,6 @@
 "use client";
 
-import {FaceRobot, File, FilePlus, LayoutSideContentLeft, Pencil} from "@gravity-ui/icons";
+import {FaceRobot, FilePlus, LayoutSideContentLeft, Pencil} from "@gravity-ui/icons";
 import {Avatar, Button, ScrollShadow} from "@heroui/react";
 
 import {SidebarSkeleton} from "../Skelentons";
@@ -17,7 +17,6 @@ type SidebarProps = {
   isNewConversationActive: boolean;
   onCloseMobile: () => void;
   onNewDocument: () => void;
-  onOpenDocuments: () => void;
   onNewConversation: () => void;
   onOpenSettings: () => void;
   onSelectConversation: (conversationId: string) => void;
@@ -34,7 +33,6 @@ export function Sidebar({
   isNewConversationActive,
   onCloseMobile,
   onNewDocument,
-  onOpenDocuments,
   onNewConversation,
   onOpenSettings,
   onSelectConversation,
@@ -107,24 +105,6 @@ export function Sidebar({
                 </span>
               </Button>
 
-              <Button
-                fullWidth
-                className={"justify-start text-foreground " + (isCollapsed ? "md:h-10 md:w-10 md:min-w-10 md:justify-center md:px-0" : "")}
-                size="sm"
-                variant="ghost"
-                onPress={onOpenDocuments}
-              >
-                <span
-                  className={"flex min-w-0 items-center gap-2 " + (isCollapsed ? "md:w-full md:justify-center md:gap-0" : "")}
-                >
-                  <File className="h-4 w-4 shrink-0" />
-                  <span
-                    className={"overflow-hidden whitespace-nowrap text-sm transition-[opacity,transform,width] duration-200 " + labelState}
-                  >
-                    Documentos
-                  </span>
-                </span>
-              </Button>
             </div>
 
             <div
@@ -251,20 +231,6 @@ export function Sidebar({
             </span>
           </Button>
 
-          <Button
-            fullWidth
-            className="justify-start text-foreground"
-            size="sm"
-            variant="ghost"
-            onPress={onOpenDocuments}
-          >
-            <span className="flex min-w-0 items-center gap-2">
-              <File className="h-4 w-4 shrink-0" />
-              <span className="overflow-hidden whitespace-nowrap text-sm">
-                Documentos
-              </span>
-            </span>
-          </Button>
         </div>
 
         <div className="px-4 pb-2">

@@ -40,7 +40,6 @@ export function AppSidebar() {
         isNewConversationActive={sidebar.isNewConversationActive}
         onCloseMobile={sidebar.closeMobileSidebar}
         onNewDocument={documentModal.open}
-        onOpenDocuments={sidebar.openDocuments}
         onNewConversation={sidebar.startNewConversation}
         onOpenSettings={settingsModal.open}
         onSelectConversation={sidebar.selectConversation}
