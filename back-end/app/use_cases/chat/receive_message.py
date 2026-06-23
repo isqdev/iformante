@@ -161,7 +161,11 @@ class ReceiveMessageUseCase:
 
         for document in documents:
             metadata = document.metadata
-            url = str(metadata.get("source_url") or "").strip()
+            url = str(
+                metadata.get("origin_url")
+                or metadata.get("source_url")
+                or "",
+            ).strip()
             filename = str(
                 metadata.get("filename")
                 or metadata.get("title")
