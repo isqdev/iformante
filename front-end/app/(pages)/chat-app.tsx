@@ -44,6 +44,9 @@ export function ChatApp({conversationId}: ChatAppProps) {
   const [isStreamingResponse, setIsStreamingResponse] = useState(false);
 
   const canSend = draft.trim().length > 0;
+  const shouldShowConversationSkeleton =
+    Boolean(conversationId) &&
+    (isLoadingConversation || activeConversation?.id !== conversationId);
 
   useEffect(() => {
     if (!conversationId) {
@@ -366,13 +369,13 @@ export function ChatApp({conversationId}: ChatAppProps) {
   return (
     <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-white">
       <ChatHeader
-        isLoading={isLoadingConversation}
+        isLoading={shouldShowConversationSkeleton}
         title={activeConversation?.title ?? ""}
         onOpenMobileSidebar={openMobileSidebar}
       />
 
       <section className="flex min-h-0 flex-1 flex-col">
-        {isLoadingConversation ? (
+        {shouldShowConversationSkeleton ? (
           <ChatSkeleton />
         ) : chatMessages.length > 0 ? (
           <>

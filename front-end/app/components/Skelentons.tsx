@@ -33,7 +33,7 @@ export function ChatSkeleton() {
 export function SidebarSkeleton() {
   return (
     <div aria-label="Carregando conversas" className="space-y-1">
-      {Array.from({length: 4}, (_, index) => (
+      {Array.from({length: 16}, (_, index) => (
         <Skeleton key={index} className="h-8 w-full rounded-lg" />
       ))}
     </div>

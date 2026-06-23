@@ -30,6 +30,7 @@ body {
   color: var(--foreground);
   font-family: "Google Sans Flex", "Google Sans", Arial, sans-serif;
   font-size: 16px;
+  font-weight: 400;
 }
 
 * {
