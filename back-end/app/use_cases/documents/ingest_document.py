@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import re
 import shutil
 import tempfile
@@ -15,6 +16,8 @@ from langchain_core.documents import Document
 
 from app.db import build_qdrant_vector_store, upsert_parent_documents
 
+
+logger = logging.getLogger(__name__)
 
 HEADING_PATTERN = re.compile(
     r"^\s*(?:(?:\d+(?:\.\d+)*\.?)|(?:CAP[IÍ]TULO\s+[IVXLCDM]+)|(?:ANEXO\s+[IVXLCDM]+))\s+.+",
@@ -200,10 +203,29 @@ class IngestDocumentUseCase:
         target_dir.mkdir(parents=True, exist_ok=True)
         target_path = target_dir / self._build_filename(parsed_url.path)
 
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/126.0.0.0 Safari/537.36"
+            ),
+            "Accept": "application/pdf,application/octet-stream,*/*",
+            "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Connection": "keep-alive",
+        }
+        timeout = httpx.Timeout(connect=15.0, read=120.0, write=30.0, pool=15.0)
+        downloaded_bytes = 0
+        final_url = url
+
         try:
-            async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            async with httpx.AsyncClient(
+                timeout=timeout,
+                follow_redirects=True,
+                headers=headers,
+            ) as client:
                 async with client.stream("GET", url) as response:
                     response.raise_for_status()
+                    final_url = str(response.url)
                     content_type = response.headers.get(
                         "content-type",
                         "application/octet-stream",
@@ -212,10 +234,32 @@ class IngestDocumentUseCase:
                     with target_path.open("wb") as document_file:
                         async for chunk in response.aiter_bytes():
                             if chunk:
+                                downloaded_bytes += len(chunk)
                                 document_file.write(chunk)
         except Exception:
             shutil.rmtree(target_dir, ignore_errors=True)
             raise
+
+        file_size = target_path.stat().st_size if target_path.exists() else 0
+
+        if file_size == 0 or downloaded_bytes == 0:
+            shutil.rmtree(target_dir, ignore_errors=True)
+            logger.warning(
+                "document.download_empty url=%s final_url=%s content_type=%s bytes=%s",
+                url,
+                final_url,
+                content_type,
+                downloaded_bytes,
+            )
+            raise ValueError("O arquivo baixado esta vazio.")
+
+        logger.info(
+            "document.downloaded url=%s final_url=%s content_type=%s bytes=%s",
+            url,
+            final_url,
+            content_type,
+            file_size,
+        )
 
         return target_path, content_type
 
