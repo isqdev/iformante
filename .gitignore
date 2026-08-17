@@ -6,6 +6,14 @@ aidlc-docs
 *__pycache__/
 .env
 .venv
+.agents/skills/
+back-end/downloads/
+**/AGENTS.md
+**/CLAUDE.md
+**/copilot-instructions.md
+back-end/scripts/*.md
+**/extracted.md
+**/indexed.md
 
 # Local AI development artifacts
 PLANO_*.md
