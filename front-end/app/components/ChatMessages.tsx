@@ -109,15 +109,17 @@ function StreamingStatus({showMessage}: {showMessage: boolean}) {
 
     function scheduleNextMessage() {
       displayTimeout = setTimeout(() => {
-      setIsVisible(false);
+        setIsVisible(false);
       transitionTimeout = setTimeout(() => {
         setMessageIndex((currentIndex) => {
+          const activeIndex = currentIndex ?? initialIndex;
+
           if (remainingMessageIndexes.current.length === 0) {
             remainingMessageIndexes.current =
-              createShuffledMessageIndexes(currentIndex);
+              createShuffledMessageIndexes(activeIndex);
           }
 
-          return remainingMessageIndexes.current.shift() ?? currentIndex;
+          return remainingMessageIndexes.current.shift() ?? activeIndex;
         });
         setIsVisible(true);
         scheduleNextMessage();
