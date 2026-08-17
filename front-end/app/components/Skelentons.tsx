@@ -1,6 +1,6 @@
 "use client";
 
-import {Skeleton} from "@heroui/react";
+import {Skeleton} from "@/components/ui/skeleton";
 
 export function ChatSkeleton() {
   return (
@@ -32,7 +32,7 @@ export function ChatSkeleton() {
 
 export function SidebarSkeleton() {
   return (
-    <div aria-label="Carregando conversas" className="space-y-1">
+    <div aria-label="Carregando conversas" className="flex flex-col gap-1">
       {Array.from({length: 16}, (_, index) => (
         <Skeleton key={index} className="h-8 w-full rounded-lg" />
       ))}

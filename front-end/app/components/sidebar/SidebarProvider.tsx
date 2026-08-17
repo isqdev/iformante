@@ -20,20 +20,21 @@ type ConversationSummary = {
 
 type SidebarContextValue = {
   activeConversationId: string;
-  closeMobileSidebar: () => void;
+  addOptimisticConversation: (conversation: ConversationSummary) => void;
   conversations: Conversation[];
-  isCollapsed: boolean;
   isLoadingConversations: boolean;
-  isMobileOpen: boolean;
   isNewConversationActive: boolean;
   newConversationVersion: number;
-  openMobileSidebar: () => void;
   openDocuments: () => void;
   refreshConversations: () => Promise<void>;
+  removeOptimisticConversation: (conversationId: string) => void;
+  replaceOptimisticConversation: (
+    optimisticId: string,
+    conversation: ConversationSummary,
+  ) => void;
   selectConversation: (conversationId: string) => void;
   setActiveConversationId: (conversationId: string) => void;
   startNewConversation: () => void;
-  toggleCollapse: () => void;
 };
 
 const SidebarContext = createContext<SidebarContextValue | null>(null);
@@ -45,19 +46,21 @@ export function SidebarProvider({children}: {children: ReactNode}) {
   const [activeConversationId, setActiveConversationId] = useState(
     getConversationId(pathname),
   );
-  const [isCollapsed, setIsCollapsed] = useState(false);
   const [isLoadingConversations, setIsLoadingConversations] = useState(true);
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [newConversationVersion, setNewConversationVersion] = useState(0);
 
-  const refreshConversations = useCallback(async () => {
-    setIsLoadingConversations(true);
+  const refreshConversations = useCallback(async (showLoading = false) => {
+    if (showLoading) {
+      setIsLoadingConversations(true);
+    }
 
     try {
       const response = await fetch("/api/conversations", {cache: "no-store"});
 
       if (!response.ok) {
-        setConversations([]);
+        if (showLoading) {
+          setConversations([]);
+        }
         return;
       }
 
@@ -69,60 +72,83 @@ export function SidebarProvider({children}: {children: ReactNode}) {
         })),
       );
     } catch {
-      setConversations([]);
+      if (showLoading) {
+        setConversations([]);
+      }
     } finally {
-      setIsLoadingConversations(false);
+      if (showLoading) {
+        setIsLoadingConversations(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    queueMicrotask(() => void refreshConversations());
+    queueMicrotask(() => void refreshConversations(true));
   }, [refreshConversations]);
 
   useEffect(() => {
     queueMicrotask(() => {
       setActiveConversationId(getConversationId(pathname));
-      setIsMobileOpen(false);
     });
   }, [pathname]);
 
   const value = useMemo<SidebarContextValue>(
     () => ({
       activeConversationId,
-      closeMobileSidebar: () => setIsMobileOpen(false),
+      addOptimisticConversation: (conversation) => {
+        setConversations((current) => [
+          {
+            ...conversation,
+            messages: [],
+          },
+          ...current.filter((item) => item.id !== conversation.id),
+        ]);
+      },
       conversations,
-      isCollapsed,
       isLoadingConversations,
-      isMobileOpen,
       isNewConversationActive:
         pathname === "/" && activeConversationId.length === 0,
       newConversationVersion,
-      openMobileSidebar: () => setIsMobileOpen(true),
       openDocuments: () => {
-        setIsMobileOpen(false);
         router.push("/docs");
       },
       refreshConversations,
+      removeOptimisticConversation: (conversationId) => {
+        setConversations((current) =>
+          current.filter((conversation) => conversation.id !== conversationId),
+        );
+      },
+      replaceOptimisticConversation: (optimisticId, conversation) => {
+        setConversations((current) => [
+          {
+            ...conversation,
+            messages: [],
+          },
+          ...current.filter(
+            (item) =>
+              item.id !== optimisticId && item.id !== conversation.id,
+          ),
+        ]);
+      },
       selectConversation: (conversationId: string) => {
+        if (conversationId.startsWith("optimistic-")) {
+          return;
+        }
+
         setActiveConversationId(conversationId);
-        setIsMobileOpen(false);
         router.push(`/c/${conversationId}`);
       },
       setActiveConversationId,
       startNewConversation: () => {
         setActiveConversationId("");
-        setIsMobileOpen(false);
         setNewConversationVersion((current) => current + 1);
         router.push("/");
       },
-      toggleCollapse: () => setIsCollapsed((current) => !current),
     }),
     [
       activeConversationId,
       conversations,
-      isCollapsed,
       isLoadingConversations,
-      isMobileOpen,
       newConversationVersion,
       pathname,
       refreshConversations,
@@ -132,9 +158,7 @@ export function SidebarProvider({children}: {children: ReactNode}) {
 
   return (
     <SidebarContext.Provider value={value}>
-      <div className="flex h-screen w-full overflow-hidden bg-white text-foreground">
-        {children}
-      </div>
+      {children}
     </SidebarContext.Provider>
   );
 }

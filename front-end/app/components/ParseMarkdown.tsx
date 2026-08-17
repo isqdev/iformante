@@ -6,7 +6,8 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react";
-import {Table} from "@heroui/react";
+import type {ColumnDef} from "@tanstack/react-table";
+import {DataTable} from "@/components/ui/data-table";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -45,52 +46,42 @@ function MarkdownTable({children}: {children: ReactNode}) {
   const tableSections = Children.toArray(children);
   const tableHead = tableSections.find((child) => getElementType(child) === "thead");
   const tableBody = tableSections.find((child) => getElementType(child) === "tbody");
-  const headerCells = extractTableRows(tableHead, "th")[0] ?? [];
-  const bodyRows = extractTableRows(tableBody, "td");
+  const explicitHeaderCells = extractTableRows(tableHead, "th")[0] ?? [];
+  const extractedBodyRows = extractTableRows(tableBody, "td");
+  const headerCells =
+    explicitHeaderCells.length > 0
+      ? explicitHeaderCells
+      : (extractedBodyRows[0] ?? []);
+  const bodyRows =
+    explicitHeaderCells.length > 0
+      ? extractedBodyRows
+      : extractedBodyRows.slice(1);
   const columnCount = Math.max(
     headerCells.length,
     ...bodyRows.map((row) => row.length),
     0,
   );
 
-  if (columnCount === 0) {
-    return (
-      <div className="my-4 overflow-x-auto">
-        <table className="w-full text-left text-sm">{children}</table>
-      </div>
-    );
-  }
-
-  const columns = Array.from({length: columnCount}, (_, index) => {
-    return headerCells[index] ?? `Coluna ${index + 1}`;
-  });
   const rows = bodyRows.map((row) =>
     Array.from({length: columnCount}, (_, index) => row[index] ?? ""),
   );
+  const columns: ColumnDef<ReactNode[]>[] = Array.from(
+    {length: columnCount},
+    (_, index) => ({
+      id: `column-${index}`,
+      header: () => headerCells[index] ?? `Coluna ${index + 1}`,
+      cell: ({row}) => row.original[index] ?? "",
+    }),
+  );
 
   return (
-    <Table className="my-4">
-      <Table.ScrollContainer>
-        <Table.Content aria-label="Tabela da resposta">
-          <Table.Header>
-            {columns.map((column, index) => (
-              <Table.Column key={`column-${index}`}>{column}</Table.Column>
-            ))}
-          </Table.Header>
-          <Table.Body>
-            {rows.map((row, rowIndex) => (
-              <Table.Row key={`row-${rowIndex}`}>
-                {row.map((cell, cellIndex) => (
-                  <Table.Cell key={`cell-${rowIndex}-${cellIndex}`}>
-                    {cell}
-                  </Table.Cell>
-                ))}
-              </Table.Row>
-            ))}
-          </Table.Body>
-        </Table.Content>
-      </Table.ScrollContainer>
-    </Table>
+    <div className="my-4">
+      <DataTable
+        ariaLabel="Tabela da resposta"
+        columns={columns}
+        data={rows}
+      />
+    </div>
   );
 }
 
@@ -110,9 +101,39 @@ export function ParseMarkdown({content}: ParseMarkdownProps) {
           </a>
         ),
         code: ({children}) => (
-          <code className="rounded bg-default-100 px-1.5 py-0.5 text-[0.85em]">
+          <code className="rounded bg-muted px-1.5 py-0.5 text-[0.85em]">
             {children}
           </code>
+        ),
+        h1: ({children}) => (
+          <h1 className="mb-3 mt-6 text-2xl font-bold leading-tight first:mt-0">
+            {children}
+          </h1>
+        ),
+        h2: ({children}) => (
+          <h2 className="mb-2.5 mt-5 text-xl font-bold leading-tight first:mt-0">
+            {children}
+          </h2>
+        ),
+        h3: ({children}) => (
+          <h3 className="mb-2 mt-4 text-lg font-semibold leading-snug first:mt-0">
+            {children}
+          </h3>
+        ),
+        h4: ({children}) => (
+          <h4 className="mb-2 mt-4 text-base font-semibold leading-snug first:mt-0">
+            {children}
+          </h4>
+        ),
+        h5: ({children}) => (
+          <h5 className="mb-1.5 mt-3 text-sm font-semibold leading-normal first:mt-0">
+            {children}
+          </h5>
+        ),
+        h6: ({children}) => (
+          <h6 className="mb-1.5 mt-3 text-xs font-semibold uppercase leading-normal tracking-wide first:mt-0">
+            {children}
+          </h6>
         ),
         li: ({children}) => <li className="pl-1">{children}</li>,
         ol: ({children}) => (
@@ -120,7 +141,7 @@ export function ParseMarkdown({content}: ParseMarkdownProps) {
         ),
         p: ({children}) => <p className="my-2 first:mt-0 last:mb-0">{children}</p>,
         pre: ({children}) => (
-          <pre className="my-3 overflow-x-auto rounded-lg bg-default-100 p-3 text-xs leading-6">
+          <pre className="my-3 overflow-x-auto rounded-lg bg-muted p-3 text-xs leading-6">
             {children}
           </pre>
         ),

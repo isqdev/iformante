@@ -2,11 +2,25 @@
 
 import {startTransition, useEffect, useMemo, useState} from "react";
 import {useRouter} from "next/navigation";
-import {Toast} from "@heroui/react";
+import {toast} from "sonner";
+import {cn} from "@/lib/utils";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
+import {Card} from "@/components/ui/card";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 import {ChatInput} from "../components/ChatInput";
 import {ChatHeader} from "../components/ChatHeader";
 import {ChatMessages} from "../components/ChatMessages";
+import {PdfViewer} from "../components/PdfViewer";
 import {ChatSkeleton} from "../components/Skelentons";
 import {useSidebar} from "../components/sidebar/SidebarProvider";
 import type {Conversation} from "../models/conversation";
@@ -30,8 +44,10 @@ type SseEvent = {
 export function ChatApp({conversationId}: ChatAppProps) {
   const router = useRouter();
   const {
-    openMobileSidebar,
+    addOptimisticConversation,
     refreshConversations,
+    removeOptimisticConversation,
+    replaceOptimisticConversation,
     setActiveConversationId,
     newConversationVersion,
   } = useSidebar();
@@ -42,11 +58,24 @@ export function ChatApp({conversationId}: ChatAppProps) {
     Boolean(conversationId),
   );
   const [isStreamingResponse, setIsStreamingResponse] = useState(false);
+  const [selectedSource, setSelectedSource] = useState<MessageSource | null>(
+    null,
+  );
+  const [isDesktopLayout, setIsDesktopLayout] = useState(false);
 
   const canSend = draft.trim().length > 0;
   const shouldShowConversationSkeleton =
     Boolean(conversationId) &&
     (isLoadingConversation || activeConversation?.id !== conversationId);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(min-width: 1024px)");
+    const updateLayout = () => setIsDesktopLayout(mediaQuery.matches);
+
+    updateLayout();
+    mediaQuery.addEventListener("change", updateLayout);
+    return () => mediaQuery.removeEventListener("change", updateLayout);
+  }, []);
 
   useEffect(() => {
     if (!conversationId) {
@@ -77,7 +106,7 @@ export function ChatApp({conversationId}: ChatAppProps) {
         if (!response.ok) {
           setActiveConversation(null);
           router.replace("/");
-          Toast.toast.warning("Chat não encontrado");
+          toast.warning("Chat não encontrado");
           return;
         }
 
@@ -90,7 +119,7 @@ export function ChatApp({conversationId}: ChatAppProps) {
         if (!isCancelled) {
           setActiveConversation(null);
           router.replace("/");
-          Toast.toast.warning("Chat não encontrado");
+          toast.warning("Chat não encontrado");
         }
       } finally {
         if (!isCancelled) {
@@ -109,6 +138,7 @@ export function ChatApp({conversationId}: ChatAppProps) {
       setActiveConversation(null);
       setDraft("");
       setIsLoadingConversation(false);
+      setSelectedSource(null);
     });
   }, [newConversationVersion]);
 
@@ -123,6 +153,7 @@ export function ChatApp({conversationId}: ChatAppProps) {
     content: string,
     isStreaming: boolean,
     sources?: MessageSource[],
+    usesRag?: boolean,
   ) {
     startTransition(() => {
       setActiveConversation((current) => {
@@ -142,6 +173,7 @@ export function ChatApp({conversationId}: ChatAppProps) {
                   content,
                   isStreaming,
                   sources: sources ?? message.sources,
+                  usesRag: usesRag ?? message.usesRag,
                 }
               : message,
           ),
@@ -158,6 +190,9 @@ export function ChatApp({conversationId}: ChatAppProps) {
     }
 
     const existingConversationId = activeConversation?.id ?? null;
+    const optimisticConversationId = existingConversationId
+      ? null
+      : `optimistic-${crypto.randomUUID()}`;
     const userMessage: Message = {
       id: createTemporaryMessageId("user"),
       role: "user",
@@ -185,6 +220,12 @@ export function ChatApp({conversationId}: ChatAppProps) {
         };
 
     setActiveConversation(localConversation);
+    if (optimisticConversationId) {
+      addOptimisticConversation({
+        id: optimisticConversationId,
+        title: localConversation.title,
+      });
+    }
     setDraft("");
     setIsStreamingResponse(true);
 
@@ -231,6 +272,7 @@ export function ChatApp({conversationId}: ChatAppProps) {
             currentAssistantContent: assistantContent,
             event,
             fallbackTitle: trimmedDraft,
+            optimisticConversationId,
             resolvedConversationId,
           });
 
@@ -253,6 +295,7 @@ export function ChatApp({conversationId}: ChatAppProps) {
           currentAssistantContent: assistantContent,
           event,
           fallbackTitle: trimmedDraft,
+          optimisticConversationId,
           resolvedConversationId,
         });
 
@@ -274,6 +317,10 @@ export function ChatApp({conversationId}: ChatAppProps) {
       );
       void refreshConversations();
     } catch (error) {
+      if (optimisticConversationId && !resolvedConversationId) {
+        removeOptimisticConversation(optimisticConversationId);
+      }
+
       const message =
         error instanceof Error
           ? error.message
@@ -295,12 +342,14 @@ export function ChatApp({conversationId}: ChatAppProps) {
     currentAssistantContent,
     event,
     fallbackTitle,
+    optimisticConversationId,
     resolvedConversationId,
   }: {
     assistantMessageId: string;
     currentAssistantContent: string;
     event: SseEvent;
     fallbackTitle: string;
+    optimisticConversationId: string | null;
     resolvedConversationId: string | null;
   }): string | null {
     if (event.event === "conversation") {
@@ -319,6 +368,12 @@ export function ChatApp({conversationId}: ChatAppProps) {
         return nextConversation;
       });
       setActiveConversationId(payload.conversation_id);
+      if (optimisticConversationId) {
+        replaceOptimisticConversation(optimisticConversationId, {
+          id: payload.conversation_id,
+          title: payload.title || fallbackTitle.slice(0, 48),
+        });
+      }
 
       if (!resolvedConversationId) {
         window.history.replaceState(null, "", `/c/${payload.conversation_id}`);
@@ -339,13 +394,26 @@ export function ChatApp({conversationId}: ChatAppProps) {
       );
     }
 
+    if (event.event === "rag") {
+      const payload = JSON.parse(event.data) as {active?: boolean};
+
+      updateAssistantMessage(
+        resolvedConversationId,
+        assistantMessageId,
+        currentAssistantContent,
+        true,
+        undefined,
+        payload.active === true,
+      );
+    }
+
     if (event.event === "error") {
       const payload = JSON.parse(event.data) as {message?: string};
       const errorMessage = payload.message ?? "Erro ao gerar resposta.";
 
       if (errorMessage.toLocaleLowerCase("pt-BR").includes("conversa nao encontrada")) {
         router.replace("/");
-        Toast.toast.warning("Chat não encontrado");
+        toast.warning("Chat não encontrado");
       }
 
       throw new Error(errorMessage);
@@ -366,52 +434,118 @@ export function ChatApp({conversationId}: ChatAppProps) {
     return null;
   }
 
-  return (
-    <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-white">
-      <ChatHeader
-        isLoading={shouldShowConversationSkeleton}
-        title={activeConversation?.title ?? ""}
-        onOpenMobileSidebar={openMobileSidebar}
-      />
+  const chatContent = (
+    <Card
+      className={cn(
+        "mt-2 mr-2 mb-2 ml-2 h-[calc(100%-1rem)] min-w-0 gap-0 rounded-lg border border-sidebar-border bg-sidebar py-0 shadow-sm ring-0 md:ml-0",
+        isDesktopLayout && selectedSource && "md:mr-1",
+      )}
+    >
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-transparent!">
+        <ChatHeader
+          isLoading={shouldShowConversationSkeleton}
+          title={activeConversation?.title ?? ""}
+        />
 
-      <section className="flex min-h-0 flex-1 flex-col">
-        {shouldShowConversationSkeleton ? (
-          <ChatSkeleton />
-        ) : chatMessages.length > 0 ? (
-          <>
-            <ChatMessages messages={chatMessages} />
-
-            <div className="px-4 py-4 md:px-6">
-              <ChatInput
-                canSend={canSend}
-                draft={draft}
-                isStreaming={isStreamingResponse}
-                onDraftChange={setDraft}
-                onSend={handleSendMessage}
+        <section className="relative flex min-h-0 flex-1 flex-col">
+          {shouldShowConversationSkeleton ? (
+            <ChatSkeleton />
+          ) : chatMessages.length > 0 ? (
+            <>
+              <ChatMessages
+                messages={chatMessages}
+                onOpenSource={setSelectedSource}
               />
-            </div>
-          </>
-        ) : (
-          <div className="flex flex-1 flex-col items-center justify-center px-4 py-8 md:px-6">
-            <div className="w-full max-w-3xl">
-              <div className="mb-10 text-center">
-                <h1 className="text-3xl font-semibold">
-                  Pergunte sobre o IF!
-                </h1>
+
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 px-4 py-4 md:px-6">
+                <div className="pointer-events-auto">
+                  <ChatInput
+                    canSend={canSend}
+                    draft={draft}
+                    focusKey={`${conversationId ?? "new"}:${newConversationVersion}`}
+                    isStreaming={isStreamingResponse}
+                    onDraftChange={setDraft}
+                    onSend={handleSendMessage}
+                  />
+                </div>
               </div>
+            </>
+          ) : (
+            <div className="flex flex-1 flex-col items-center justify-center px-4 py-8 md:px-6">
+              <div className="w-full max-w-3xl">
+                <div className="mb-10 text-center">
+                  <h1 className="text-3xl font-semibold">
+                    Pergunte sobre o IF!
+                  </h1>
+                </div>
 
-              <ChatInput
-                canSend={canSend}
-                draft={draft}
-                isStreaming={isStreamingResponse}
-                onDraftChange={setDraft}
-                onSend={handleSendMessage}
-              />
+                <ChatInput
+                  canSend={canSend}
+                  draft={draft}
+                  focusKey={`${conversationId ?? "new"}:${newConversationVersion}`}
+                  isStreaming={isStreamingResponse}
+                  onDraftChange={setDraft}
+                  onSend={handleSendMessage}
+                />
+              </div>
             </div>
-          </div>
-        )}
-      </section>
-    </main>
+          )}
+        </section>
+      </main>
+    </Card>
+  );
+
+  if (isDesktopLayout && selectedSource) {
+    return (
+      <ResizablePanelGroup orientation="horizontal">
+        <ResizablePanel defaultSize="58%" minSize="40%">
+          {chatContent}
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel defaultSize="42%" minSize="30%">
+          <Card className="mt-2 mr-2 mb-2 ml-1 h-[calc(100%-1rem)] gap-0 rounded-lg border border-sidebar-border bg-sidebar py-0 shadow-sm ring-0">
+            <PdfViewer
+              key={selectedSource.document_id}
+              filename={selectedSource.filename}
+              url={`/api/documents/${encodeURIComponent(selectedSource.document_id)}/content`}
+              onClose={() => setSelectedSource(null)}
+            />
+          </Card>
+        </ResizablePanel>
+      </ResizablePanelGroup>
+    );
+  }
+
+  return (
+    <>
+      {chatContent}
+      <Sheet
+        open={Boolean(selectedSource)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedSource(null);
+        }}
+      >
+        <SheetContent
+          className="w-full gap-0 p-0 sm:max-w-none"
+          showCloseButton={false}
+        >
+          <SheetTitle className="sr-only">
+            {selectedSource?.filename ?? "Visualizador de PDF"}
+          </SheetTitle>
+          <SheetDescription className="sr-only">
+            Visualizacao do documento armazenado.
+          </SheetDescription>
+          {selectedSource ? (
+            <PdfViewer
+              key={selectedSource.document_id}
+              filename={selectedSource.filename}
+              url={`/api/documents/${encodeURIComponent(selectedSource.document_id)}/content`}
+              onClose={() => setSelectedSource(null)}
+            />
+          ) : null}
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }
 

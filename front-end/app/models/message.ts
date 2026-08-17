@@ -1,4 +1,5 @@
 export type MessageSource = {
+  document_id: string;
   filename: string;
   url: string;
 };
@@ -8,5 +9,6 @@ export type Message = {
   role: "assistant" | "user";
   content: string;
   isStreaming?: boolean;
+  usesRag?: boolean;
   sources?: MessageSource[];
 };

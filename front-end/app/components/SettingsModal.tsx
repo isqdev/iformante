@@ -1,54 +1,45 @@
 "use client";
 
-import {type MouseEvent} from "react";
-import {Button, Modal, type UseOverlayStateReturn} from "@heroui/react";
+import {Button} from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 import type {User} from "../models/user";
 
 type SettingsModalProps = {
-  state: UseOverlayStateReturn;
+  open: boolean;
   user: User;
+  onOpenChange: (open: boolean) => void;
 };
 
-export function SettingsModal({state, user}: SettingsModalProps) {
-  function stopModalClickPropagation(event: MouseEvent) {
-    event.stopPropagation();
-  }
-
+export function SettingsModal({
+  open,
+  user,
+  onOpenChange,
+}: SettingsModalProps) {
   return (
-    <Modal state={state}>
-      <Modal.Backdrop
-        className="bg-backdrop"
-        isDismissable
-        onClick={state.close}
-      >
-        <Modal.Container
-          className="flex min-h-screen items-center justify-center p-4"
-          placement="center"
-        >
-          <Modal.Dialog
-            className="w-[min(92vw,28rem)] rounded-2xl bg-overlay p-6 shadow-overlay"
-            onClick={stopModalClickPropagation}
-          >
-            <Modal.Header>
-              <Modal.Heading>Configuracoes</Modal.Heading>
-            </Modal.Header>
-            <Modal.Body>
-              <div className="space-y-2">
-                <p className="text-sm">{user.name}</p>
-                <p className="text-sm text-muted">
-                  {user.role}
-                </p>
-              </div>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button variant="ghost" onPress={state.close}>
-                Fechar
-              </Button>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Configurações</DialogTitle>
+          <DialogDescription>Informações da conta atual.</DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-2">
+          <p className="text-sm">{user.name}</p>
+          <p className="text-sm text-muted-foreground">{user.role}</p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Fechar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

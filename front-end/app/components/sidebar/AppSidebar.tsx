@@ -1,7 +1,6 @@
 "use client";
 
-import {useSyncExternalStore} from "react";
-import {Toast, useOverlayState} from "@heroui/react";
+import {useState} from "react";
 
 import {DocumentModal} from "../DocumentModal";
 import {SettingsModal} from "../SettingsModal";
@@ -15,18 +14,9 @@ const currentUser: User = {
 };
 
 export function AppSidebar() {
-  const isMounted = useSyncExternalStore(
-    () => () => undefined,
-    () => true,
-    () => false,
-  );
   const sidebar = useSidebar();
-  const settingsModal = useOverlayState();
-  const documentModal = useOverlayState();
-
-  if (!isMounted) {
-    return null;
-  }
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isDocumentOpen, setIsDocumentOpen] = useState(false);
 
   return (
     <>
@@ -34,21 +24,20 @@ export function AppSidebar() {
         activeConversationId={sidebar.activeConversationId}
         conversations={sidebar.conversations}
         currentUser={currentUser}
-        isCollapsed={sidebar.isCollapsed}
         isLoadingConversations={sidebar.isLoadingConversations}
-        isMobileOpen={sidebar.isMobileOpen}
         isNewConversationActive={sidebar.isNewConversationActive}
-        onCloseMobile={sidebar.closeMobileSidebar}
-        onNewDocument={documentModal.open}
+        onNewDocument={() => setIsDocumentOpen(true)}
         onNewConversation={sidebar.startNewConversation}
-        onOpenSettings={settingsModal.open}
+        onOpenSettings={() => setIsSettingsOpen(true)}
         onSelectConversation={sidebar.selectConversation}
-        onToggleCollapse={sidebar.toggleCollapse}
       />
 
-      <DocumentModal state={documentModal} />
-      <SettingsModal state={settingsModal} user={currentUser} />
-      <Toast.Provider placement="top end" />
+      <DocumentModal open={isDocumentOpen} onOpenChange={setIsDocumentOpen} />
+      <SettingsModal
+        open={isSettingsOpen}
+        user={currentUser}
+        onOpenChange={setIsSettingsOpen}
+      />
     </>
   );
 }

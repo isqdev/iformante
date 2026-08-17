@@ -1,27 +1,21 @@
 "use client";
 
-import {Button, Skeleton} from "@heroui/react";
-import {LayoutSideContentLeft} from "@gravity-ui/icons";
+import {SidebarTrigger} from "@/components/ui/sidebar";
+import {Skeleton} from "@/components/ui/skeleton";
+import {ThemeToggle} from "./ThemeToggle";
 
 type ChatHeaderProps = {
   isLoading?: boolean;
   title: string;
-  onOpenMobileSidebar: () => void;
 };
 
-export function ChatHeader({isLoading = false, title, onOpenMobileSidebar}: ChatHeaderProps) {
+export function ChatHeader({isLoading = false, title}: ChatHeaderProps) {
   return (
     <header className="relative flex h-14 items-center justify-center border-b px-4 md:px-6">
-      <Button
-        isIconOnly
+      <SidebarTrigger
         aria-label="Abrir menu lateral"
-        className="absolute left-4 md:hidden"
-        size="sm"
-        variant="ghost"
-        onPress={onOpenMobileSidebar}
-      >
-        <LayoutSideContentLeft className="h-4 w-4" />
-      </Button>
+        className="absolute left-4"
+      />
 
       {isLoading ? (
         <Skeleton aria-label="Carregando titulo da conversa" className="h-4 w-40 rounded-sm" />
@@ -30,6 +24,10 @@ export function ChatHeader({isLoading = false, title, onOpenMobileSidebar}: Chat
           {title}
         </span>
       ) : null}
+
+      <div className="absolute right-4">
+        <ThemeToggle />
+      </div>
     </header>
   );
 }

@@ -1,15 +1,27 @@
 "use client";
 
-import {useEffect, useRef} from "react";
-import {Button, TextArea, Toast, useOverlayState} from "@heroui/react";
-import {Microphone, PaperPlane} from "@gravity-ui/icons";
+import {useEffect, useRef, useState} from "react";
+import {toast} from "sonner";
+import {Microphone, PaperPlane, Xmark} from "@gravity-ui/icons";
+import {Button} from "@/components/ui/button";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupTextarea,
+} from "@/components/ui/input-group";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 import {useSpeechRecognition} from "../hooks/useSpeechRecognition";
-import {VoiceInputModal} from "./VoiceInputModal";
+import {AudioVisualizer} from "./AudioVisualizer";
 
 type ChatInputProps = {
   canSend: boolean;
   draft: string;
+  focusKey: string;
   isStreaming?: boolean;
   onDraftChange: (value: string) => void;
   onSend: (message?: string) => void;
@@ -18,20 +30,22 @@ type ChatInputProps = {
 export function ChatInput({
   canSend,
   draft,
+  focusKey,
   isStreaming = false,
   onDraftChange,
   onSend,
 }: ChatInputProps) {
   const composerRef = useRef<HTMLDivElement>(null);
-  const voiceModal = useOverlayState();
+  const [isVoiceInputActive, setIsVoiceInputActive] = useState(false);
+  const hasDraft = draft.trim().length > 0;
   const speechRecognition = useSpeechRecognition({
     onError: (message) => {
-      voiceModal.close();
-      Toast.toast.danger(message);
+      setIsVoiceInputActive(false);
+      toast.error(message);
       focusInput();
     },
     onFinalTranscript: (transcript) => {
-      voiceModal.close();
+      setIsVoiceInputActive(false);
       onSend(transcript);
       focusInput();
     },
@@ -57,29 +71,40 @@ export function ChatInput({
       return;
     }
 
-    voiceModal.open();
-
     if (!speechRecognition.start()) {
-      voiceModal.close();
+      setIsVoiceInputActive(false);
+      return;
     }
+
+    setIsVoiceInputActive(true);
   }
 
   function handleCancelVoiceInput() {
     speechRecognition.cancel();
-    voiceModal.close();
+    setIsVoiceInputActive(false);
     focusInput();
   }
+
+  function handleSubmitVoiceInput() {
+    if (!speechRecognition.submit()) {
+      toast.info("Fale antes de enviar o áudio.");
+    }
+  }
+
+  useEffect(() => {
+    focusInput();
+  }, [focusKey]);
 
   useEffect(() => {
     function handleVoiceShortcut(event: KeyboardEvent) {
       if (
         event.key.toLowerCase() !== "m" ||
         event.altKey ||
-        event.ctrlKey ||
+        !event.ctrlKey ||
         event.metaKey ||
+        event.shiftKey ||
         event.repeat ||
-        isEditableElement(document.activeElement) ||
-        voiceModal.isOpen ||
+        isVoiceInputActive ||
         isStreaming ||
         !speechRecognition.isSupported
       ) {
@@ -96,12 +121,24 @@ export function ChatInput({
 
   return (
     <>
-      <div className="mx-auto w-full max-w-3xl">
-        <div ref={composerRef} className="chat-composer rounded-3xl border bg-field px-3 py-2">
-          <div className="flex min-h-12 items-center gap-2">
-            <TextArea
+      <div ref={composerRef} className="mx-auto w-full max-w-3xl">
+        <InputGroup className="chat-glass-input min-h-16 rounded-3xl border-border p-2 shadow-md">
+          {isVoiceInputActive ? (
+            <div
+              aria-label="Entrada de voz em andamento"
+              className="flex min-h-12 min-w-0 flex-1 items-center gap-3 px-2"
+              role="status"
+            >
+              <Microphone className="shrink-0" />
+              <AudioVisualizer active={speechRecognition.isListening} />
+              <span className="sr-only" aria-live="polite">
+                {speechRecognition.transcript || "Pode falar"}
+              </span>
+            </div>
+          ) : (
+            <InputGroupTextarea
               aria-label="Digite sua mensagem"
-              className="chat-composer-textarea flex-1"
+              className="max-h-40 min-h-12"
               placeholder="Qual a sua duvida?"
               rows={1}
               value={draft}
@@ -113,52 +150,80 @@ export function ChatInput({
                 }
               }}
             />
+          )}
 
-            {draft.trim().length === 0 ? (
+          {isVoiceInputActive ? (
+            <InputGroupAddon align="inline-end" className="mr-0! gap-2 p-0!">
               <Button
-                isIconOnly
-                aria-label="Iniciar entrada por voz"
-                isDisabled={!speechRecognition.isSupported || isStreaming}
-                size="md"
+                aria-label="Cancelar entrada por voz"
+                size="icon-lg"
                 variant="outline"
-                onPress={handleStartVoiceInput}
+                onClick={handleCancelVoiceInput}
               >
-                <Microphone className="h-5 w-5" />
+                <Xmark />
               </Button>
-            ) : null}
-
-            <Button
-              isIconOnly
-              aria-label="Enviar mensagem"
-              isDisabled={!canSend || isStreaming}
-              size="md"
-              variant="primary"
-              onPress={handleSend}
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      aria-label="Enviar áudio"
+                      disabled={!speechRecognition.transcript.trim()}
+                      size="icon-lg"
+                      variant="default"
+                      onClick={handleSubmitVoiceInput}
+                    >
+                      <PaperPlane />
+                    </Button>
+                  }
+                />
+                <TooltipContent>Enviar áudio</TooltipContent>
+              </Tooltip>
+            </InputGroupAddon>
+          ) : !hasDraft || !isStreaming ? (
+            <InputGroupAddon
+              align="inline-end"
+              className="mr-0! gap-2 p-0!"
             >
-              <PaperPlane className="h-5 w-5" />
-            </Button>
-          </div>
-        </div>
+              {!hasDraft ? (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      aria-label="Iniciar entrada por voz"
+                      disabled={!speechRecognition.isSupported || isStreaming}
+                      size="icon-lg"
+                      variant="outline"
+                      onClick={handleStartVoiceInput}
+                    >
+                      <Microphone />
+                    </Button>
+                  }
+                />
+                <TooltipContent>Ctrl + M</TooltipContent>
+              </Tooltip>
+              ) : null}
+
+            {hasDraft && !isStreaming ? (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    aria-label="Enviar mensagem"
+                    size="icon-lg"
+                    variant="default"
+                    onClick={handleSend}
+                  >
+                    <PaperPlane />
+                  </Button>
+                }
+              />
+              <TooltipContent>Enviar mensagem</TooltipContent>
+            </Tooltip>
+            ) : null}
+            </InputGroupAddon>
+          ) : null}
+        </InputGroup>
       </div>
-
-      <VoiceInputModal
-        isListening={speechRecognition.isListening}
-        state={voiceModal}
-        transcript={speechRecognition.transcript}
-        onCancel={handleCancelVoiceInput}
-      />
     </>
-  );
-}
-
-function isEditableElement(element: Element | null) {
-  if (!(element instanceof HTMLElement)) {
-    return false;
-  }
-
-  return Boolean(
-    element.closest(
-      'input, textarea, select, [contenteditable="true"], [role="textbox"]',
-    ),
   );
 }

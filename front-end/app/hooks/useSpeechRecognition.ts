@@ -107,6 +107,22 @@ export function useSpeechRecognition({
     setTranscript("");
   }, []);
 
+  const submit = useCallback(() => {
+    const normalizedTranscript = transcriptRef.current.trim();
+
+    if (!normalizedTranscript || submittedRef.current) {
+      return false;
+    }
+
+    submittedRef.current = true;
+    clearTimeoutIfPresent(silenceTimeoutRef);
+    recognitionRef.current?.stop();
+    recognitionRef.current = null;
+    setIsListening(false);
+    onFinalTranscriptRef.current(normalizedTranscript);
+    return true;
+  }, []);
+
   const start = useCallback(() => {
     const SpeechRecognition =
       window.SpeechRecognition ?? window.webkitSpeechRecognition;
@@ -147,11 +163,7 @@ export function useSpeechRecognition({
         return;
       }
 
-      submittedRef.current = true;
-      recognition.stop();
-      recognitionRef.current = null;
-      setIsListening(false);
-      onFinalTranscriptRef.current(normalizedTranscript);
+      submit();
     }
 
     function restartSilenceTimeout(timeout = SILENCE_TIMEOUT_MS) {
@@ -226,13 +238,14 @@ export function useSpeechRecognition({
       onErrorRef.current("Não foi possível iniciar o reconhecimento de voz.");
       return false;
     }
-  }, []);
+  }, [submit]);
 
   return {
     cancel,
     isListening,
     isSupported,
     start,
+    submit,
     transcript,
   };
 }
