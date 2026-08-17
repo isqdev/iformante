@@ -71,3 +71,22 @@ class Conversation(Base):
         back_populates="conversation",
         cascade="all, delete-orphan",
     )
+
+    @classmethod
+    def start(cls, anonymous_id: str, first_message: str) -> "Conversation":
+        return cls(
+            anonymous_id=anonymous_id,
+            title=cls._build_title(first_message),
+        )
+
+    def touch(self) -> None:
+        self.updated_at = datetime.now(UTC)
+
+    @staticmethod
+    def _build_title(content: str) -> str:
+        title = " ".join(content.split())
+
+        if len(title) <= 48:
+            return title
+
+        return f"{title[:48].rstrip()}..."

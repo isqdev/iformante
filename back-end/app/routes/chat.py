@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import StreamingResponse
 from app.factories.chat import get_receive_message_use_case
 from app.models import generate_id
-from app.schemas import SendMessageRequest
+from app.dtos import SendMessageRequest
 from app.use_cases import ReceiveMessageUseCase
 
 ANONYMOUS_COOKIE_NAME = "iformante_anonymous_id"

@@ -9,12 +9,15 @@ from app.security import hash_password, verify_password
 
 
 class ModelTests(unittest.TestCase):
-    def test_generate_id_returns_five_alphanumeric_characters(self) -> None:
+    def test_generate_id_returns_nine_lowercase_alphanumeric_characters(self) -> None:
         generated_id = generate_id()
 
-        self.assertEqual(len(generated_id), 5)
+        self.assertEqual(len(generated_id), 9)
         self.assertTrue(
-            all(character in string.ascii_letters + string.digits for character in generated_id),
+            all(
+                character in string.ascii_lowercase + string.digits
+                for character in generated_id
+            ),
         )
 
     def test_metadata_contains_relational_tables(self) -> None:

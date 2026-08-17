@@ -17,23 +17,15 @@ class Settings:
 
     openai_embedding_dimensions: int
 
-    qdrant_url: str | None
-
-    qdrant_api_key: str | None
-
-    qdrant_collection: str
-
     rag_top_k: int
 
-    chat_history_limit: int
+    rag_candidate_count: int
+
+    rag_reranker_model: str
 
     database_url: str | None
 
-    cloudinary_cloud_name: str | None
-
-    cloudinary_api_key: str | None
-
-    cloudinary_api_secret: str | None
+    document_storage_dir: str
 
     @staticmethod
     def from_env() -> "Settings":
@@ -47,15 +39,16 @@ class Settings:
             openai_embedding_dimensions=int(
                 os.getenv("OPENAI_EMBEDDING_DIMENSIONS", "1536"),
             ),
-            qdrant_url=os.getenv("QDRANT_URL"),
-            qdrant_api_key=os.getenv("QDRANT_API_KEY"),
-            qdrant_collection=os.getenv("QDRANT_COLLECTION", "my-collection"),
             rag_top_k=int(os.getenv("RAG_TOP_K", "8")),
-            chat_history_limit=int(os.getenv("CHAT_HISTORY_LIMIT", "12")),
+            rag_candidate_count=int(
+                os.getenv("RAG_CANDIDATE_COUNT", "32"),
+            ),
+            rag_reranker_model=os.getenv(
+                "RAG_RERANKER_MODEL",
+                "gpt-5-nano",
+            ),
             database_url=Settings._normalize_database_url(os.getenv("DATABASE_URL")),
-            cloudinary_cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
-            cloudinary_api_key=os.getenv("CLOUDINARY_API_KEY"),
-            cloudinary_api_secret=os.getenv("CLOUDINARY_API_SECRET"),
+            document_storage_dir=os.getenv("DOCUMENT_STORAGE_DIR", "downloads"),
         )
 
     @staticmethod

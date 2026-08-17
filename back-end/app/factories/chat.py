@@ -1,4 +1,3 @@
-from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends
@@ -6,54 +5,66 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.db import get_database_session
+from app.factories.rag import (
+    get_answer_generator,
+    get_question_router,
+)
+from app.repositories import (
+    ConversationRepository,
+    MessageRepository,
+    MessageSourceRepository,
+    RagRepository,
+    RagRetrievalAuditRepository,
+)
+from app.repositories import UnitOfWork
+from app.rag.generation import AnswerGenerator, QuestionRouter
+from app.rag.retrieval import ParentRetriever
+from app.use_cases.conversations import GetConversationUseCase, ListConversationsUseCase
 from app.use_cases.chat import (
-    ConversationManager,
     ReceiveMessageUseCase,
-    ReplyMessageUseCase,
-    RouteOrRetrieveMessageUseCase,
 )
 
 
-@lru_cache(maxsize=1)
-def get_route_or_retrieve_message_use_case() -> RouteOrRetrieveMessageUseCase:
-    return RouteOrRetrieveMessageUseCase(
-        api_key=settings.openai_api_key,
-        model=settings.openai_model,
-        top_k=settings.rag_top_k,
-    )
-
-
-@lru_cache(maxsize=1)
-def get_reply_message_use_case() -> ReplyMessageUseCase:
-    return ReplyMessageUseCase(
-        api_key=settings.openai_api_key,
-        model=settings.openai_model,
-    )
-
-
-def get_conversation_manager(
+def get_list_conversations_use_case(
     session: Annotated[AsyncSession, Depends(get_database_session)],
-) -> ConversationManager:
-    return ConversationManager(session)
+) -> ListConversationsUseCase:
+    return ListConversationsUseCase(ConversationRepository(session))
+
+
+def get_get_conversation_use_case(
+    session: Annotated[AsyncSession, Depends(get_database_session)],
+) -> GetConversationUseCase:
+    return GetConversationUseCase(
+        conversation_repository=ConversationRepository(session),
+        message_repository=MessageRepository(session),
+    )
 
 
 def get_receive_message_use_case(
-    conversation_manager: Annotated[
-        ConversationManager,
-        Depends(get_conversation_manager),
-    ],
+    session: Annotated[AsyncSession, Depends(get_database_session)],
     route_use_case: Annotated[
-        RouteOrRetrieveMessageUseCase,
-        Depends(get_route_or_retrieve_message_use_case),
+        QuestionRouter,
+        Depends(get_question_router),
     ],
     reply_use_case: Annotated[
-        ReplyMessageUseCase,
-        Depends(get_reply_message_use_case),
+        AnswerGenerator,
+        Depends(get_answer_generator),
     ],
 ) -> ReceiveMessageUseCase:
     return ReceiveMessageUseCase(
-        conversation_manager=conversation_manager,
-        route_or_retrieve_message_use_case=route_use_case,
-        reply_message_use_case=reply_use_case,
-        history_limit=settings.chat_history_limit,
+        conversation_repository=ConversationRepository(session),
+        message_repository=MessageRepository(session),
+        unit_of_work=UnitOfWork(session),
+        question_router=route_use_case,
+        answer_generator=reply_use_case,
+        parent_retriever=ParentRetriever(
+            settings.openai_api_key,
+            settings.openai_embedding_model,
+            settings.rag_top_k,
+            RagRepository(session),
+            settings.rag_reranker_model,
+            settings.rag_candidate_count,
+        ),
+        message_source_repository=MessageSourceRepository(session),
+        rag_retrieval_audit_repository=RagRetrievalAuditRepository(session),
     )

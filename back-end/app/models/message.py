@@ -9,6 +9,7 @@ from app.models.base import Base, generate_id
 
 if TYPE_CHECKING:
     from app.models.conversation import Conversation
+    from app.models.message_source import MessageSource
 
 
 class MessageAuthor(str, Enum):
@@ -51,3 +52,25 @@ class Message(Base):
         "Conversation",
         back_populates="messages",
     )
+    sources: Mapped[list["MessageSource"]] = relationship(
+        "MessageSource",
+        back_populates="message",
+        cascade="all, delete-orphan",
+        order_by="MessageSource.rank",
+    )
+
+    @classmethod
+    def from_user(cls, conversation_id: str, content: str) -> "Message":
+        return cls(
+            conversation_id=conversation_id,
+            author=MessageAuthor.USER.value,
+            content=content,
+        )
+
+    @classmethod
+    def from_assistant(cls, conversation_id: str, content: str) -> "Message":
+        return cls(
+            conversation_id=conversation_id,
+            author=MessageAuthor.AI.value,
+            content=content,
+        )

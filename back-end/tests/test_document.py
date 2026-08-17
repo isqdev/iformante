@@ -9,24 +9,22 @@ from qdrant_client.models import Filter
 from app.app import app
 from app.routes.document import (
     get_delete_document_use_case,
-    get_document_manager,
     get_ingest_document_use_case,
 )
 from app.use_cases.documents.delete_document import DeleteDocumentUseCase
-from app.use_cases.documents.ingest_document import (
+from app.rag.ingestion import (
     CHILD_CHUNK_OVERLAP,
     CHILD_CHUNK_TOKEN_LIMIT,
     PARENT_CHUNK_TOKEN_LIMIT,
+    DocumentIngestor,
     ParentChunk,
     IngestDocumentResult,
-    IngestDocumentUseCase,
     StructuredBlock,
 )
 
 
 class FakeIngestDocumentUseCase:
-    async def execute(self, url: str, document_id: str | None = None) -> IngestDocumentResult:
-        self.document_id = document_id
+    async def execute(self, url: str) -> IngestDocumentResult:
         return IngestDocumentResult(
             filename="document-test.pdf",
             storage_url="https://res.cloudinary.com/example/raw/upload/document-test.pdf",
@@ -44,29 +42,9 @@ class FakeDeleteDocumentUseCase:
         return Result()
 
 
-class FakeDocument:
-    id = "doc123456"
-
-
-class FakeDocumentManager:
-    async def create_processing_document(self, source_url: str) -> FakeDocument:
-        self.source_url = source_url
-        return FakeDocument()
-
-    async def mark_document_indexed(
-        self,
-        document,
-        file_name: str,
-        stored_path: str,
-        total_chunks: int,
-    ) -> None:
-        return None
-
-    async def mark_document_error(self, document) -> None:
-        return None
-
-
 class FakeStreamResponse:
+    status_code = 200
+    url = "https://example.com/document.pdf"
     headers = {"content-type": "text/plain"}
 
     def raise_for_status(self) -> None:
@@ -88,7 +66,6 @@ class DocumentRouteTests(unittest.TestCase):
     def setUp(self) -> None:
         app.dependency_overrides[get_ingest_document_use_case] = FakeIngestDocumentUseCase
         app.dependency_overrides[get_delete_document_use_case] = FakeDeleteDocumentUseCase
-        app.dependency_overrides[get_document_manager] = FakeDocumentManager
         self.client = TestClient(app)
 
     def tearDown(self) -> None:
@@ -148,17 +125,22 @@ class FakeDeletionDocument:
     file_name = "document.pdf"
 
 
-class FakeDeletionDocumentManager:
-    async def get_document(self, document_id):
+class FakeDeletionDocumentRepository:
+    async def get_by_id(self, document_id):
         return FakeDeletionDocument()
 
-    async def delete_document(self, document):
+    async def delete(self, document):
         self.deleted_document = document
 
 
-class IngestDocumentUseCaseTests(unittest.IsolatedAsyncioTestCase):
-    def build_use_case(self, storage_dir: Path | None = None) -> IngestDocumentUseCase:
-        return IngestDocumentUseCase(
+class FakeUnitOfWork:
+    async def commit(self):
+        self.committed = True
+
+
+class DocumentIngestorTests(unittest.IsolatedAsyncioTestCase):
+    def build_use_case(self, storage_dir: Path | None = None) -> DocumentIngestor:
+        return DocumentIngestor(
             openai_api_key="test-key",
             qdrant_url="https://qdrant.example",
             qdrant_api_key="test-qdrant-key",
@@ -415,7 +397,8 @@ class DeleteDocumentUseCaseTests(unittest.IsolatedAsyncioTestCase):
         use_case = DeleteDocumentUseCase(
             qdrant_url="https://qdrant.example",
             qdrant_collection="my-collection",
-            document_manager=FakeDeletionDocumentManager(),
+            document_repository=FakeDeletionDocumentRepository(),
+            unit_of_work=FakeUnitOfWork(),
             cloudinary_cloud_name="test-cloud",
             cloudinary_api_key="test-key",
             cloudinary_api_secret="test-secret",
@@ -445,7 +428,8 @@ class DeleteDocumentUseCaseTests(unittest.IsolatedAsyncioTestCase):
         use_case = DeleteDocumentUseCase(
             qdrant_url="https://qdrant.example",
             qdrant_collection="my-collection",
-            document_manager=FakeDeletionDocumentManager(),
+            document_repository=FakeDeletionDocumentRepository(),
+            unit_of_work=FakeUnitOfWork(),
             cloudinary_cloud_name="test-cloud",
             cloudinary_api_key="test-key",
             cloudinary_api_secret="test-secret",

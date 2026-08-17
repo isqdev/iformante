@@ -1,12 +1,16 @@
 from .chat import ChatMessage, SendMessageRequest
-from .conversation import ConversationResponse, ConversationSummaryResponse, MessageResponse
+from .conversation import (
+    ConversationResponse,
+    ConversationSummaryResponse,
+    MessageResponse,
+    MessageSourceResponse,
+)
 from .document import (
     DeleteDocumentResponse,
     DocumentResponse,
     DownloadDocumentRequest,
     DownloadDocumentResponse,
 )
-from .test import TestChunkResult, TestSearchRequest, TestSearchResponse
 
 __all__ = [
     "ChatMessage",
@@ -17,8 +21,6 @@ __all__ = [
     "DownloadDocumentRequest",
     "DownloadDocumentResponse",
     "MessageResponse",
+    "MessageSourceResponse",
     "SendMessageRequest",
-    "TestChunkResult",
-    "TestSearchRequest",
-    "TestSearchResponse",
 ]

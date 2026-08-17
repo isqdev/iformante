@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from app.models.base import Base, generate_id
 
 if TYPE_CHECKING:
+    from app.models.rag import RagDocumentParent
     from app.models.user import User
 
 
@@ -82,3 +83,40 @@ class Document(Base):
         "User",
         back_populates="documents",
     )
+    rag_parents: Mapped[list["RagDocumentParent"]] = relationship(
+        "RagDocumentParent", back_populates="document", cascade="all, delete-orphan"
+    )
+
+    @classmethod
+    def start_ingestion(
+        cls,
+        source_url: str,
+        title: str,
+        uploaded_by: str,
+    ) -> "Document":
+        return cls(
+            title=title,
+            source_url=source_url,
+            file_name="",
+            stored_path="",
+            ingestion_status=IngestionStatus.PROCESSING.value,
+            total_chunks=0,
+            uploaded_by=uploaded_by,
+        )
+
+    def mark_as_indexed(
+        self,
+        file_name: str,
+        stored_path: str,
+        total_chunks: int,
+    ) -> None:
+        if total_chunks <= 0:
+            raise ValueError("Um documento indexado precisa possuir chunks.")
+
+        self.file_name = file_name
+        self.stored_path = stored_path
+        self.total_chunks = total_chunks
+        self.ingestion_status = IngestionStatus.INDEXED.value
+
+    def mark_as_error(self) -> None:
+        self.ingestion_status = IngestionStatus.ERROR.value

@@ -1,7 +1,10 @@
+from typing import Any
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from app.models import Message
+from app.models import Message, MessageSource
 
 
 class MessageRepository:
@@ -20,9 +23,25 @@ class MessageRepository:
         result = await self._session.execute(
             select(Message)
             .where(Message.conversation_id == conversation_id)
+            .options(
+                selectinload(Message.sources).selectinload(
+                    MessageSource.document,
+                ),
+            )
             .order_by(Message.created_at.asc()),
         )
         return list(result.scalars().all())
+
+    async def list_model_history(
+        self,
+        conversation_id: str,
+    ) -> list[Any]:
+        result = await self._session.execute(
+            select(Message.author, Message.content)
+            .where(Message.conversation_id == conversation_id)
+            .order_by(Message.created_at.asc()),
+        )
+        return list(result.all())
 
     async def list_recent_by_conversation(
         self,
