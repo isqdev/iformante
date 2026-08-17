@@ -1,0 +1,64 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 512 512"
+  role="img"
+  aria-labelledby="informante-logo-title informante-logo-description"
+>
+  <title id="informante-logo-title">Logo do InFormante</title>
+  <desc id="informante-logo-description">
+    Rosto branco com expressão misteriosa usando um chapéu escuro com faixa coral.
+  </desc>
+
+  <g id="face">
+    <path
+      d="M121 245C121 174 176 127 256 127C336 127 391 174 391 245V290C391 375 336 427 256 427C176 427 121 375 121 290Z"
+      fill="#FFFFFF"
+      stroke="#FFFFFF"
+      stroke-width="12"
+      stroke-linejoin="round"
+    />
+  </g>
+
+  <g id="eyes" fill="#172527">
+    <path
+      id="eye-left"
+      d="M165 275H224C223 297 212 310 195 310C178 310 167 297 165 275Z"
+    />
+    <path
+      id="eye-right"
+      d="M288 275H347C345 297 334 310 317 310C300 310 289 297 288 275Z"
+    />
+  </g>
+
+  <path
+    id="mouth"
+    d="M238 350C250 353 262 353 274 349"
+    fill="none"
+    stroke="#172527"
+    stroke-width="9"
+    stroke-linecap="round"
+  />
+
+  <g id="hat" stroke="#FFFFFF" stroke-linejoin="round">
+    <path
+      id="hat-crown"
+      d="M151 215L176 86C180 66 197 55 216 60L249 68C258 70 267 68 275 64L314 43C332 34 353 43 361 62L414 185Z"
+      fill="#172527"
+      stroke-width="12"
+    />
+
+    <path
+      id="hat-band"
+      d="M158 181C224 198 306 195 397 164L411 194C312 231 222 234 151 215Z"
+      fill="#FF634D"
+      stroke="none"
+    />
+
+    <path
+      id="hat-brim"
+      d="M91 220C147 205 205 199 260 197C320 195 374 183 421 166C451 155 473 160 479 174C486 191 469 207 438 220C373 249 298 267 218 274C157 280 102 275 72 260C50 249 57 230 91 220Z"
+      fill="#172527"
+      stroke-width="12"
+    />
+  </g>
+</svg>
