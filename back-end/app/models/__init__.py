@@ -1,6 +1,6 @@
 from app.models.base import Base, generate_id
 from app.models.conversation import Conversation
-from app.models.document import Document, IngestionStatus
+from app.models.document import Document, DocumentSourceType, IngestionStatus
 from app.models.message import Message, MessageAuthor
 from app.models.message_source import MessageSource
 from app.models.rag import RagDocumentChild, RagDocumentParent
@@ -11,6 +11,7 @@ __all__ = [
     "Base",
     "Conversation",
     "Document",
+    "DocumentSourceType",
     "IngestionStatus",
     "Message",
     "MessageAuthor",

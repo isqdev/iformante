@@ -3,6 +3,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 import httpx
+from fastapi import UploadFile
 
 
 @dataclass(frozen=True)
@@ -53,6 +54,43 @@ class DocumentStorage:
         except Exception:
             temporary.unlink(missing_ok=True)
             raise
+
+        return DownloadedPdf(filename=filename, path=target)
+
+    async def save_pdf_upload(
+        self,
+        upload: UploadFile,
+        document_id: str,
+        max_bytes: int = 25 * 1024 * 1024,
+    ) -> DownloadedPdf:
+        filename = Path(upload.filename or "documento.pdf").name
+        if not filename.lower().endswith(".pdf"):
+            raise ValueError("Envie um arquivo PDF.")
+
+        document_dir = self.document_dir(document_id)
+        document_dir.mkdir(parents=True, exist_ok=True)
+        target = document_dir / "original.pdf"
+        temporary = document_dir / "original.pdf.tmp"
+        written = 0
+
+        try:
+            with temporary.open("wb") as output:
+                while chunk := await upload.read(1024 * 1024):
+                    written += len(chunk)
+                    if written > max_bytes:
+                        raise ValueError("O PDF excede o limite de 25 MB.")
+                    output.write(chunk)
+
+            with temporary.open("rb") as pdf_file:
+                signature = pdf_file.read(5)
+            if written == 0 or not signature.startswith(b"%PDF-"):
+                raise ValueError("O arquivo enviado nao e um PDF valido.")
+            temporary.replace(target)
+        except Exception:
+            temporary.unlink(missing_ok=True)
+            raise
+        finally:
+            await upload.close()
 
         return DownloadedPdf(filename=filename, path=target)
 

@@ -19,6 +19,11 @@ class IngestionStatus(str, Enum):
     ERROR = "ERROR"
 
 
+class DocumentSourceType(str, Enum):
+    PDF = "PDF"
+    WEB_PAGE = "WEB_PAGE"
+
+
 class Document(Base):
     __tablename__ = "documents"
 
@@ -33,9 +38,15 @@ class Document(Base):
         nullable=False,
     )
 
-    source_url: Mapped[str] = mapped_column(
+    source_url: Mapped[str | None] = mapped_column(
         String(2048),
+        nullable=True,
+    )
+
+    source_type: Mapped[str] = mapped_column(
+        String(20),
         nullable=False,
+        default=DocumentSourceType.PDF.value,
     )
 
     file_name: Mapped[str] = mapped_column(
@@ -90,13 +101,15 @@ class Document(Base):
     @classmethod
     def start_ingestion(
         cls,
-        source_url: str,
+        source_url: str | None,
         title: str,
         uploaded_by: str,
+        source_type: DocumentSourceType = DocumentSourceType.PDF,
     ) -> "Document":
         return cls(
             title=title,
             source_url=source_url,
+            source_type=source_type.value,
             file_name="",
             stored_path="",
             ingestion_status=IngestionStatus.PROCESSING.value,

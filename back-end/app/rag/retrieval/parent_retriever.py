@@ -15,8 +15,9 @@ class RetrievedParent:
     document_id: str
     content: str
     bbox: list[dict] | None
-    source_url: str
+    source_url: str | None
     filename: str
+    source_type: str = "PDF"
 
 
 @dataclass(frozen=True)
@@ -126,10 +127,11 @@ class ParentRetriever:
 
     def _to_result(self, parent: RagDocumentParent) -> RetrievedParent:
         return RetrievedParent(
-            parent.id,
-            parent.document_id,
-            parent.content,
-            parent.bbox,
-            parent.document.source_url,
-            parent.document.file_name or parent.document.title,
+            id=parent.id,
+            document_id=parent.document_id,
+            content=parent.content,
+            bbox=parent.bbox,
+            source_url=parent.document.source_url,
+            filename=parent.document.file_name or parent.document.title,
+            source_type=parent.document.source_type,
         )

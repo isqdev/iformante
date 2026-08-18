@@ -16,6 +16,7 @@ dependencies = [
     "pwdlib[argon2]>=0.3.0",
     "pymupdf>=1.27.2.3",
     "pymupdf4llm>=0.2.9",
+    "python-multipart>=0.0.20",
     "python-dotenv>=1.2.2",
     "sqlalchemy>=2.0.45",
     "tiktoken>=0.13.0",

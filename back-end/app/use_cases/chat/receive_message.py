@@ -286,11 +286,11 @@ class ReceiveMessageUseCase:
         for document in parents:
             if document.id not in used_ids:
                 continue
-            url = document.source_url.strip()
+            url = document.source_url or ""
             filename = document.filename.strip()
-            source_key = url
+            source_key = url or document.id
 
-            if not url or source_key in seen_keys:
+            if source_key in seen_keys:
                 continue
 
             seen_keys.add(source_key)
@@ -299,6 +299,7 @@ class ReceiveMessageUseCase:
                     "document_id": document.document_id,
                     "filename": filename,
                     "url": url,
+                    "source_type": document.source_type,
                 },
             )
 

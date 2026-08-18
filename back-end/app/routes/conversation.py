@@ -91,15 +91,17 @@ def _message_sources(message: Message) -> list[MessageSourceResponse]:
     sources: list[MessageSourceResponse] = []
     seen_urls: set[str] = set()
     for source in message.sources:
-        url = source.document.source_url.strip()
-        if not url or url in seen_urls:
+        url = source.document.source_url
+        unique_key = url or source.document_id
+        if unique_key in seen_urls:
             continue
-        seen_urls.add(url)
+        seen_urls.add(unique_key)
         sources.append(
             MessageSourceResponse(
                 document_id=source.document_id,
                 filename=(source.document.file_name or source.document.title).strip(),
                 url=url,
+                source_type=source.document.source_type,
             ),
         )
     return sources

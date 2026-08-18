@@ -167,6 +167,65 @@ class DocumentIngestor:
             chunks_indexed=len(children),
         )
 
+    async def execute_markdown(
+        self,
+        markdown: str,
+        document_id: str,
+        filename: str,
+        storage_path: Path,
+    ) -> IngestDocumentResult:
+        """Indexa Markdown de uma pagina web sem passar pelo extrator de PDF."""
+        pages = [{"text": markdown, "metadata": {"page": 0}}]
+        await asyncio.to_thread(
+            self._document_storage.persist_markdown,
+            document_id,
+            markdown,
+            markdown,
+        )
+        parents_documents, children_documents = await asyncio.to_thread(
+            self._prepare_chunks,
+            pages,
+        )
+        if not children_documents:
+            raise ValueError("A pagina nao possui conteudo textual para indexar.")
+
+        vectors = await self._embeddings.aembed_documents(
+            [child.page_content for child in children_documents],
+        )
+        parents = [
+            RagDocumentParent(
+                id=parent.metadata["parent_id"],
+                document_id=document_id,
+                content=parent.page_content,
+                bbox=[],
+                chunk_index=index,
+                token_count=self._parent_splitter._length_function(parent.page_content),
+            )
+            for index, parent in enumerate(parents_documents)
+        ]
+        child_indexes: dict[str, int] = {}
+        children: list[RagDocumentChild] = []
+        for child, vector in zip(children_documents, vectors, strict=True):
+            parent_id = child.metadata["parent_id"]
+            chunk_index = child_indexes.get(parent_id, 0)
+            child_indexes[parent_id] = chunk_index + 1
+            children.append(
+                RagDocumentChild(
+                    id=generate_id(),
+                    parent_id=parent_id,
+                    content=child.page_content,
+                    embedding=vector,
+                    chunk_index=chunk_index,
+                    token_count=self._child_splitter._length_function(child.page_content),
+                )
+            )
+        await self._rag_repository.replace_document_chunks(document_id, parents, children)
+        return IngestDocumentResult(
+            filename=filename,
+            storage_url=str(storage_path),
+            chunks_indexed=len(children),
+        )
+
     def _prepare_chunks(
         self,
         pages: object,

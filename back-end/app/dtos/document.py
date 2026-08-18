@@ -1,11 +1,11 @@
 from pydantic import BaseModel, Field
 
 
-class DownloadDocumentRequest(BaseModel):
-    url: str = Field(min_length=1)
+class CreateWebPageRequest(BaseModel):
+    url: str = Field(min_length=1, max_length=2048)
 
 
-class DownloadDocumentResponse(BaseModel):
+class IngestDocumentResponse(BaseModel):
     filename: str
     path: str
     chunks_indexed: int
@@ -14,7 +14,8 @@ class DownloadDocumentResponse(BaseModel):
 class DocumentResponse(BaseModel):
     id: str
     name: str
-    url: str
+    url: str | None
+    source_type: str
 
 
 class DeleteDocumentResponse(BaseModel):

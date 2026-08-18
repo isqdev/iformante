@@ -4,7 +4,8 @@ from pydantic import BaseModel, Field
 class MessageSourceResponse(BaseModel):
     document_id: str
     filename: str
-    url: str
+    url: str | None
+    source_type: str
 
 
 class MessageResponse(BaseModel):

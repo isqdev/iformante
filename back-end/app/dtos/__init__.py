@@ -8,8 +8,8 @@ from .conversation import (
 from .document import (
     DeleteDocumentResponse,
     DocumentResponse,
-    DownloadDocumentRequest,
-    DownloadDocumentResponse,
+    CreateWebPageRequest,
+    IngestDocumentResponse,
 )
 
 __all__ = [
@@ -18,8 +18,8 @@ __all__ = [
     "ConversationSummaryResponse",
     "DeleteDocumentResponse",
     "DocumentResponse",
-    "DownloadDocumentRequest",
-    "DownloadDocumentResponse",
+    "CreateWebPageRequest",
+    "IngestDocumentResponse",
     "MessageResponse",
     "MessageSourceResponse",
     "SendMessageRequest",

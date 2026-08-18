@@ -1,7 +1,7 @@
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
-from app.models import Document
+from app.models import Document, DocumentSourceType
 from app.rag.ingestion import DocumentIngestor, IngestDocumentResult
 from app.repositories import DocumentRepository, UnitOfWork
 from app.services import DocumentStorage
@@ -27,6 +27,7 @@ class IngestDocumentUseCase:
             source_url=source_url,
             title=self._build_title(source_url),
             uploaded_by=HARDCODED_DOCUMENT_UPLOADER_ID,
+            source_type=DocumentSourceType.PDF,
         )
         await self._repository.create(document)
         await self._unit_of_work.commit()
