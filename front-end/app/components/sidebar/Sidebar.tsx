@@ -1,6 +1,6 @@
 "use client";
 
-import {FaceRobot, FilePlus, Pencil} from "@gravity-ui/icons";
+import {FaceRobot, FilePlus, FileText, Pencil} from "@gravity-ui/icons";
 import {Avatar, AvatarFallback} from "@/components/ui/avatar";
 import {
   Sidebar as UiSidebar,
@@ -26,6 +26,7 @@ type SidebarProps = {
   currentUser: User;
   isLoadingConversations: boolean;
   isNewConversationActive: boolean;
+  onOpenDocuments: () => void;
   onNewDocument: () => void;
   onNewConversation: () => void;
   onOpenSettings: () => void;
@@ -38,6 +39,7 @@ export function Sidebar({
   currentUser,
   isLoadingConversations,
   isNewConversationActive,
+  onOpenDocuments,
   onNewDocument,
   onNewConversation,
   onOpenSettings,
@@ -82,6 +84,15 @@ export function Sidebar({
                 >
                   <FilePlus />
                   <span>Novo documento</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip="Documentos"
+                  onClick={() => runAndCloseMobile(onOpenDocuments)}
+                >
+                  <FileText />
+                  <span>Documentos</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

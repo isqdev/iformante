@@ -1,7 +1,8 @@
 export type MessageSource = {
   document_id: string;
   filename: string;
-  url: string;
+  url: string | null;
+  source_type?: "PDF" | "WEB_PAGE";
 };
 
 export type Message = {

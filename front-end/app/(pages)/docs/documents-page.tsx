@@ -19,7 +19,8 @@ import {
 type DocumentItem = {
   id: string;
   name: string;
-  url: string;
+  url: string | null;
+  source_type: "PDF" | "WEB_PAGE";
 };
 
 export function DocumentsPage() {
@@ -55,6 +56,8 @@ export function DocumentsPage() {
 
   useEffect(() => {
     queueMicrotask(() => void loadDocuments());
+    window.addEventListener("documents:changed", loadDocuments);
+    return () => window.removeEventListener("documents:changed", loadDocuments);
   }, [loadDocuments]);
 
   async function deleteDocument(documentId: string) {
@@ -137,13 +140,15 @@ export function DocumentsPage() {
                           aria-label={`Abrir ${document.name}`}
                           size="icon-sm"
                           variant="ghost"
-                          onClick={() =>
-                            window.open(
-                              document.url,
-                              "_blank",
-                              "noopener,noreferrer",
-                            )
-                          }
+                          onClick={() => {
+                            const target =
+                              document.source_type === "PDF"
+                                ? `/api/documents/${document.id}/content`
+                                : document.url;
+                            if (target) {
+                              window.open(target, "_blank", "noopener,noreferrer");
+                            }
+                          }}
                         >
                           <ArrowUpRightFromSquare />
                         </Button>

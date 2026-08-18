@@ -26,6 +26,7 @@ export function AppSidebar() {
         currentUser={currentUser}
         isLoadingConversations={sidebar.isLoadingConversations}
         isNewConversationActive={sidebar.isNewConversationActive}
+        onOpenDocuments={sidebar.openDocuments}
         onNewDocument={() => setIsDocumentOpen(true)}
         onNewConversation={sidebar.startNewConversation}
         onOpenSettings={() => setIsSettingsOpen(true)}

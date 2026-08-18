@@ -6,6 +6,7 @@ import {
   FaceRobot,
   FileText,
 } from "@gravity-ui/icons";
+import {Globe, SquareArrowOutUpRight} from "lucide-react";
 import {Bouncy} from "ldrs/react";
 import {toast} from "sonner";
 import "ldrs/react/Bouncy.css";
@@ -230,7 +231,10 @@ export function ChatMessages({messages, onOpenSource}: ChatMessagesProps) {
                                 </CardTitle>
                               </CardHeader>
                               <CardContent className="flex flex-col gap-2">
-                                {message.sources.map((source) => (
+                                {message.sources.map((source) => {
+                                  const isWebPage = source.source_type === "WEB_PAGE";
+
+                                  return (
                                   <div
                                     key={source.document_id}
                                     className="flex min-w-0 gap-2"
@@ -238,15 +242,31 @@ export function ChatMessages({messages, onOpenSource}: ChatMessagesProps) {
                                     <Button
                                       className="min-w-0 flex-1 justify-start"
                                       variant="source"
-                                      onClick={() => onOpenSource(source)}
+                                      onClick={() => {
+                                        if (isWebPage && source.url) {
+                                          window.open(source.url, "_blank", "noopener,noreferrer");
+                                          return;
+                                        }
+                                        onOpenSource(source);
+                                      }}
                                     >
-                                      <FileText data-icon="inline-start" />
+                                      {isWebPage ? (
+                                        <Globe data-icon="inline-start" />
+                                      ) : (
+                                        <FileText data-icon="inline-start" />
+                                      )}
                                       <span className="min-w-0 truncate">
                                         {source.filename}
                                       </span>
+                                      {isWebPage && (
+                                        <SquareArrowOutUpRight
+                                          className="ml-auto size-4 shrink-0"
+                                        />
+                                      )}
                                     </Button>
                                   </div>
-                                ))}
+                                  );
+                                })}
                               </CardContent>
                             </Card>
                             </>

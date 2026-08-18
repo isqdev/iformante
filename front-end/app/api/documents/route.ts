@@ -24,23 +24,16 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const payload = await request.json().catch(() => null);
-
-  if (!payload?.url || typeof payload.url !== "string") {
-    return NextResponse.json(
-      {error: "Informe o link do documento."},
-      {status: 400},
-    );
-  }
-
   try {
-    const response = await fetch(`${backendUrl}/documents/download`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({url: payload.url}),
-    });
+    const isMultipart = request.headers
+      .get("content-type")
+      ?.includes("multipart/form-data");
+    const response = isMultipart
+      ? await fetch(`${backendUrl}/documents/upload`, {
+          method: "POST",
+          body: await request.formData(),
+        })
+      : await forwardWebPageRequest(request);
 
     if (!response.ok) {
       const errorPayload = (await response.json().catch(() => null)) as
@@ -54,10 +47,28 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(await response.json());
-  } catch {
+  } catch (error) {
+    if (error instanceof InvalidRequestError) {
+      return NextResponse.json({error: error.message}, {status: 400});
+    }
     return NextResponse.json(
       {error: "Nao foi possivel conectar ao back-end."},
       {status: 502},
     );
   }
 }
+
+async function forwardWebPageRequest(request: Request) {
+  const payload = await request.json().catch(() => null);
+  if (!payload?.url || typeof payload.url !== "string") {
+    throw new InvalidRequestError("Informe o link da página.");
+  }
+
+  return fetch(`${backendUrl}/documents/web-page`, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({url: payload.url}),
+  });
+}
+
+class InvalidRequestError extends Error {}
