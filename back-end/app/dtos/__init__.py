@@ -10,6 +10,7 @@ from .document import (
     DocumentResponse,
     CreateWebPageRequest,
     IngestDocumentResponse,
+    RenameDocumentRequest,
 )
 
 __all__ = [
@@ -20,6 +21,7 @@ __all__ = [
     "DocumentResponse",
     "CreateWebPageRequest",
     "IngestDocumentResponse",
+    "RenameDocumentRequest",
     "MessageResponse",
     "MessageSourceResponse",
     "SendMessageRequest",

@@ -24,6 +24,7 @@ class WebPageIngestUseCase:
             title=extracted.title,
             uploaded_by=HARDCODED_DOCUMENT_UPLOADER_ID,
             source_type=DocumentSourceType.WEB_PAGE,
+            file_name=extracted.title[:255],
         )
         await self.repository.create(document)
         await self.unit_of_work.commit()

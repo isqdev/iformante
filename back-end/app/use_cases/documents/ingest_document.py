@@ -28,6 +28,7 @@ class IngestDocumentUseCase:
             title=self._build_title(source_url),
             uploaded_by=HARDCODED_DOCUMENT_UPLOADER_ID,
             source_type=DocumentSourceType.PDF,
+            file_name=self._build_title(source_url),
         )
         await self._repository.create(document)
         await self._unit_of_work.commit()

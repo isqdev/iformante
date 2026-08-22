@@ -21,11 +21,15 @@ class PdfUploadIngestUseCase:
         normalized_title = title.strip()
         if not normalized_title:
             raise ValueError("Informe o titulo do PDF.")
+        file_name = (upload.filename or "").strip()
+        if not file_name:
+            raise ValueError("O arquivo PDF precisa possuir um nome.")
         document = Document.start_ingestion(
             source_url=None,
             title=normalized_title[:255],
             uploaded_by=HARDCODED_DOCUMENT_UPLOADER_ID,
             source_type=DocumentSourceType.PDF,
+            file_name=file_name[:255],
         )
         await self.repository.create(document)
         await self.unit_of_work.commit()

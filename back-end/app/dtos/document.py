@@ -16,6 +16,12 @@ class DocumentResponse(BaseModel):
     name: str
     url: str | None
     source_type: str
+    status: str
+    uploaded_by_name: str
+
+
+class RenameDocumentRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=255)
 
 
 class DeleteDocumentResponse(BaseModel):

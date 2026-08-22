@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from httpx import HTTPError, HTTPStatusError
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.db import get_database_session
@@ -18,6 +19,7 @@ from app.dtos import (
     DeleteDocumentResponse,
     DocumentResponse,
     IngestDocumentResponse,
+    RenameDocumentRequest,
 )
 from app.use_cases import DeleteDocumentUseCase
 from app.use_cases.documents import ListDocumentsUseCase
@@ -65,9 +67,11 @@ async def list_documents(
     return [
         DocumentResponse(
             id=document.id,
-            name=document.file_name or document.title,
+            name=document.title,
             url=document.source_url,
             source_type=document.source_type,
+            status=document.ingestion_status,
+            uploaded_by_name=document.uploaded_by_user.name.split(maxsplit=1)[0],
         )
         for document in documents
     ]
@@ -84,6 +88,8 @@ async def upload_document(
 ) -> IngestDocumentResponse:
     try:
         result = await use_case.execute(file, title)
+    except IntegrityError as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Já existe um documento com este nome.") from error
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -122,6 +128,8 @@ async def ingest_web_page(
 ) -> IngestDocumentResponse:
     try:
         result = await use_case.execute(payload.url)
+    except IntegrityError as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Esta página já foi adicionada.") from error
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
     except HTTPStatusError as error:
@@ -141,6 +149,29 @@ async def ingest_web_page(
         filename=result.filename,
         path=result.storage_url,
         chunks_indexed=result.chunks_indexed,
+    )
+
+
+@router.patch("/{document_id}", response_model=DocumentResponse)
+async def rename_document(
+    document_id: str,
+    payload: RenameDocumentRequest,
+    session: Annotated[AsyncSession, Depends(get_database_session)],
+) -> DocumentResponse:
+    repository = DocumentRepository(session)
+    document = await repository.get_by_id(document_id)
+    if document is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento nao encontrado.")
+
+    document = await repository.rename(document, payload.title.strip())
+    await session.commit()
+    return DocumentResponse(
+        id=document.id,
+        name=document.title,
+        url=document.source_url,
+        source_type=document.source_type,
+        status=document.ingestion_status,
+        uploaded_by_name=document.uploaded_by_user.name.split(maxsplit=1)[0],
     )
 
 

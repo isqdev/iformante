@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from enum import Enum
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import TYPE_CHECKING
 
@@ -26,6 +26,10 @@ class DocumentSourceType(str, Enum):
 
 class Document(Base):
     __tablename__ = "documents"
+    __table_args__ = (
+        UniqueConstraint("file_name", name="uq_documents_file_name"),
+        UniqueConstraint("source_url", name="uq_documents_source_url"),
+    )
 
     id: Mapped[str] = mapped_column(
         String(9),
@@ -105,12 +109,13 @@ class Document(Base):
         title: str,
         uploaded_by: str,
         source_type: DocumentSourceType = DocumentSourceType.PDF,
+        file_name: str = "",
     ) -> "Document":
         return cls(
             title=title,
             source_url=source_url,
             source_type=source_type.value,
-            file_name="",
+            file_name=file_name,
             stored_path="",
             ingestion_status=IngestionStatus.PROCESSING.value,
             total_chunks=0,
