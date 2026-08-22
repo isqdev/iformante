@@ -106,6 +106,9 @@ body {
   --border: oklch(0.922 0 0);
   --skeleton: oklch(0.72 0.08 156.45);
   --source-card-border: oklch(0.55 0 0);
+  --document-status-pending: oklch(0.78 0.16 68);
+  --document-status-processing: oklch(0.88 0.16 95);
+  --document-status-indexed: oklch(0.72 0.15 150);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
   --chart-1: oklch(0.87 0 0);
@@ -144,6 +147,9 @@ body {
   --border: oklch(1 0 0 / 10%);
   --skeleton: oklch(0.42 0.07 156.45);
   --source-card-border: oklch(0.68 0 0);
+  --document-status-pending: oklch(0.7 0.14 68);
+  --document-status-processing: oklch(0.8 0.14 95);
+  --document-status-indexed: oklch(0.68 0.14 150);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
   --chart-1: oklch(0.87 0 0);

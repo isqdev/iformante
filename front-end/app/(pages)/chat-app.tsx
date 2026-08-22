@@ -9,18 +9,13 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import {Card} from "@/components/ui/card";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetTitle,
-} from "@/components/ui/sheet";
 
 import {ChatInput} from "../components/ChatInput";
 import {ChatHeader} from "../components/ChatHeader";
 import {ChatMessages} from "../components/ChatMessages";
 import {PdfViewer} from "../components/PdfViewer";
+import {DocumentPreview} from "../components/DocumentPreview";
+import {PageContainer} from "../components/PageContainer";
 import {ChatSkeleton} from "../components/Skelentons";
 import {useSidebar} from "../components/sidebar/SidebarProvider";
 import type {Conversation} from "../models/conversation";
@@ -435,9 +430,9 @@ export function ChatApp({conversationId}: ChatAppProps) {
   }
 
   const chatContent = (
-    <Card
+    <PageContainer
       className={cn(
-        "mt-2 mr-2 mb-2 ml-2 h-[calc(100%-1rem)] min-w-0 gap-0 rounded-lg border border-sidebar-border bg-sidebar py-0 shadow-sm ring-0 md:ml-0",
+        "mr-2",
         isDesktopLayout && selectedSource && "md:mr-1",
       )}
     >
@@ -492,7 +487,7 @@ export function ChatApp({conversationId}: ChatAppProps) {
           )}
         </section>
       </main>
-    </Card>
+    </PageContainer>
   );
 
   if (isDesktopLayout && selectedSource) {
@@ -503,14 +498,14 @@ export function ChatApp({conversationId}: ChatAppProps) {
         </ResizablePanel>
         <ResizableHandle withHandle />
         <ResizablePanel defaultSize="42%" minSize="30%">
-          <Card className="mt-2 mr-2 mb-2 ml-1 h-[calc(100%-1rem)] gap-0 rounded-lg border border-sidebar-border bg-sidebar py-0 shadow-sm ring-0">
+          <PageContainer className="ml-1 mr-2">
             <PdfViewer
               key={selectedSource.document_id}
               filename={selectedSource.filename}
               url={`/api/documents/${encodeURIComponent(selectedSource.document_id)}/content`}
               onClose={() => setSelectedSource(null)}
             />
-          </Card>
+          </PageContainer>
         </ResizablePanel>
       </ResizablePanelGroup>
     );
@@ -519,32 +514,7 @@ export function ChatApp({conversationId}: ChatAppProps) {
   return (
     <>
       {chatContent}
-      <Sheet
-        open={Boolean(selectedSource)}
-        onOpenChange={(open) => {
-          if (!open) setSelectedSource(null);
-        }}
-      >
-        <SheetContent
-          className="w-full gap-0 p-0 sm:max-w-none"
-          showCloseButton={false}
-        >
-          <SheetTitle className="sr-only">
-            {selectedSource?.filename ?? "Visualizador de PDF"}
-          </SheetTitle>
-          <SheetDescription className="sr-only">
-            Visualizacao do documento armazenado.
-          </SheetDescription>
-          {selectedSource ? (
-            <PdfViewer
-              key={selectedSource.document_id}
-              filename={selectedSource.filename}
-              url={`/api/documents/${encodeURIComponent(selectedSource.document_id)}/content`}
-              onClose={() => setSelectedSource(null)}
-            />
-          ) : null}
-        </SheetContent>
-      </Sheet>
+      <DocumentPreview document={selectedSource ? {id: selectedSource.document_id, name: selectedSource.filename, source_type: selectedSource.source_type ?? "PDF", url: selectedSource.url ?? null} : null} onClose={() => setSelectedSource(null)} />
     </>
   );
 }
