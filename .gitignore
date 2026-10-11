@@ -15,6 +15,19 @@ back-end/scripts/*.md
 **/extracted.md
 **/indexed.md
 
+back-end/.uv-cache/
+front-end/test-results/
+front-end/playwright-report/
+# Downloaded Piper models and local voice verification artifacts
+back-end/voices/*.onnx
+back-end/voices/*.onnx.json
+back-end/voices/*.wav
+back-end/voices/*.part
+# Local logs and design previews
+*.log
+.superdesign/
+/eval/
+
 # Local AI development artifacts
 PLANO_*.md
 skills-lock.json
