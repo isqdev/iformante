@@ -7,3 +7,8 @@ __pycache__
 .ruff_cache
 downloads
 Dockerfile
+*.log
+voices/*.onnx
+voices/*.onnx.json
+voices/*.wav
+voices/*.part

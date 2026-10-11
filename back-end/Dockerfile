@@ -18,6 +18,8 @@ RUN uv sync --frozen --no-dev
 
 COPY . .
 
+RUN python scripts/install_call_voice.py
+
 RUN useradd --create-home --shell /usr/sbin/nologin appuser \
     && chown -R appuser:appuser /app
 
