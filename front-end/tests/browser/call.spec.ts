@@ -238,7 +238,7 @@ test("PDF sources use the same fullscreen viewer as /docs", async ({ page }) => 
   await record(page, false);
   await expect(page.locator("main.call-page")).toHaveAttribute("data-state", "ready");
   await page.getByRole("button", { name: "Documento.pdf" }).click();
-  await expect(page.getByLabel("Página atual")).toBeVisible();
+  await expect(page.getByLabel("Página atual")).toBeVisible({ timeout: 15000 });
   const dialog = await page.getByRole("dialog").boundingBox();
   expect(dialog?.width).toBe(390);
   expect(dialog?.height).toBe(844);

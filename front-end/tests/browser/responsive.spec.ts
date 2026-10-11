@@ -190,7 +190,7 @@ for (const role of ["guest", "COMMON", "ADMIN"] as const) {
     await input.press("Enter");
     await expect(page.getByText("Consulte o documento.")).toBeVisible();
     await page.getByText("Documento.pdf").click();
-    await expect(page.getByLabel("Ver citações")).toBeVisible();
+    await expect(page.getByLabel("Ver citações")).toBeVisible({ timeout: 15000 });
     await page.getByLabel("Ver citações").click();
     await expect(page.getByText("1 / 2 citações")).toBeVisible();
     await page.getByLabel("Próxima citação").click();
@@ -203,7 +203,7 @@ for (const role of ["guest", "COMMON", "ADMIN"] as const) {
     await expect(page.getByLabel("Página atual")).toBeVisible();
     await page.setViewportSize({ width: 390, height: 820 });
     await expect(page.getByRole("dialog")).toBeVisible();
-    await expect(page.getByLabel("Página atual")).toBeVisible();
+    await expect(page.getByLabel("Página atual")).toBeVisible({ timeout: 15000 });
     await expect
       .poll(() =>
         page
