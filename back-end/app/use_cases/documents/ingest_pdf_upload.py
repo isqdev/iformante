@@ -1,13 +1,19 @@
 from dataclasses import dataclass
 
-from fastapi import UploadFile
+from typing import Protocol
+
+class PdfUpload(Protocol):
+    filename: str | None
+    async def read(self, size: int = -1) -> bytes: ...
+    async def seek(self, offset: int) -> None: ...
+    async def close(self) -> None: ...
 
 from app.models import Document, DocumentSourceType
 from app.rag.ingestion import DocumentIngestor, IngestDocumentResult
 from app.repositories import DocumentRepository, UnitOfWork
 from app.services import DocumentStorage
 
-HARDCODED_DOCUMENT_UPLOADER_ID = "isaque123"
+
 
 
 @dataclass(frozen=True)
@@ -17,7 +23,7 @@ class PdfUploadIngestUseCase:
     document_storage: DocumentStorage
     document_ingestor: DocumentIngestor
 
-    async def execute(self, upload: UploadFile, title: str) -> IngestDocumentResult:
+    async def execute(self, upload: PdfUpload, title: str, uploader_id: str) -> IngestDocumentResult:
         normalized_title = title.strip()
         if not normalized_title:
             raise ValueError("Informe o titulo do PDF.")
@@ -27,7 +33,7 @@ class PdfUploadIngestUseCase:
         document = Document.start_ingestion(
             source_url=None,
             title=normalized_title[:255],
-            uploaded_by=HARDCODED_DOCUMENT_UPLOADER_ID,
+            uploaded_by=uploader_id,
             source_type=DocumentSourceType.PDF,
             file_name=file_name[:255],
         )

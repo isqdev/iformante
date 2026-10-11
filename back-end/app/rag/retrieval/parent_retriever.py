@@ -126,11 +126,15 @@ class ParentRetriever:
         print(f"[RAG] {stage}_elapsed_ms={elapsed_ms:.2f}", flush=True)
 
     def _to_result(self, parent: RagDocumentParent) -> RetrievedParent:
+        from app.services.pdf_anchors import chunk_anchors
+        anchors = parent.bbox or []
+        if parent.document.source_type == "PDF" and anchors and not any("x" in a for a in anchors):
+            anchors = chunk_anchors(parent.document.stored_path, int(anchors[0].get("page", 1)), parent.content)
         return RetrievedParent(
             id=parent.id,
             document_id=parent.document_id,
             content=parent.content,
-            bbox=parent.bbox,
+            bbox=anchors,
             source_url=parent.document.source_url,
             filename=parent.document.file_name or parent.document.title,
             source_type=parent.document.source_type,

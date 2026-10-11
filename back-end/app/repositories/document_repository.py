@@ -22,9 +22,10 @@ class DocumentRepository:
         )
         return result.scalar_one_or_none()
 
-    async def list_all(self) -> list[Document]:
+    async def list_all(self, only_indexed: bool = False) -> list[Document]:
         result = await self._session.execute(
             select(Document)
+            .where(Document.ingestion_status == "INDEXED" if only_indexed else True)
             .options(selectinload(Document.uploaded_by_user))
             .order_by(Document.created_at.desc()),
         )

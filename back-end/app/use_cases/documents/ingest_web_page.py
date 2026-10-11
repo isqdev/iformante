@@ -6,7 +6,7 @@ from app.rag.ingestion import DocumentIngestor, IngestDocumentResult
 from app.repositories import DocumentRepository, UnitOfWork
 from app.services import DocumentStorage, WebPageExtractor
 
-HARDCODED_DOCUMENT_UPLOADER_ID = "isaque123"
+
 
 
 @dataclass(frozen=True)
@@ -17,12 +17,12 @@ class WebPageIngestUseCase:
     document_ingestor: DocumentIngestor
     web_page_extractor: WebPageExtractor
 
-    async def execute(self, source_url: str) -> IngestDocumentResult:
+    async def execute(self, source_url: str, uploader_id: str, title: str | None = None) -> IngestDocumentResult:
         extracted = await self.web_page_extractor.extract(source_url.strip())
         document = Document.start_ingestion(
             source_url=source_url.strip(),
-            title=extracted.title,
-            uploaded_by=HARDCODED_DOCUMENT_UPLOADER_ID,
+            title=(title.strip() if title and title.strip() else extracted.title),
+            uploaded_by=uploader_id,
             source_type=DocumentSourceType.WEB_PAGE,
             file_name=extracted.title[:255],
         )

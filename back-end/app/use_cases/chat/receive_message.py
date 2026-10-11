@@ -4,7 +4,10 @@ from collections.abc import AsyncIterator
 from contextlib import suppress
 from dataclasses import dataclass
 from time import perf_counter
+from datetime import UTC, datetime
+from app.models import generate_id
 from typing import Any
+from app.services.speech_text import ResponseMode
 
 from app.models import (
     Conversation,
@@ -69,57 +72,33 @@ class ReceiveMessageUseCase:
     async def stream(
         self,
         conversation_id: str | None,
-        anonymous_id: str,
+        anonymous_id: str | None,
         message: str,
+        user_id: str | None = None,
+        history: list[ModelMessage] | None = None,
+        response_mode: ResponseMode = ResponseMode.TEXT,
     ) -> AsyncIterator[ChatStreamEvent]:
         assistant_content = ""
-        sources: list[dict[str, str]] = []
+        sources: list[dict[str, Any]] = []
         retrieval: ParentRetrievalResult | None = None
         router_task: asyncio.Task | None = None
         started_at = perf_counter()
 
         try:
-            initial_db_started_at = perf_counter()
-            conversation = await self._create_or_get_conversation(
-                conversation_id,
-                anonymous_id,
-                message,
-            )
-            previous_messages = (
-                await self._message_repository.list_model_history(
-                    conversation.id,
-                )
-            )
-            user_message = await self._message_repository.create(
-                Message.from_user(conversation.id, message),
-            )
-            conversation.touch()
-            model_messages = self._build_model_messages(
-                previous_messages,
-                message,
-            )
-            router_task = asyncio.create_task(
-                self._execute_router_with_timing(model_messages),
-            )
-            commit_started_at = perf_counter()
-            try:
+            conversation = None
+            if user_id:
+                conversation = await self._create_or_get_conversation(conversation_id, user_id, message)
+                if response_mode == ResponseMode.SPEECH:
+                    conversation.channel = "speech"
+                previous_messages = await self._message_repository.list_model_history(conversation.id)
+                user_message = await self._message_repository.create(Message.from_user(conversation.id, message))
+                conversation.touch()
+                model_messages = self._build_model_messages(previous_messages, message)
                 await self._unit_of_work.commit()
-            except Exception:
-                router_task.cancel()
-                with suppress(asyncio.CancelledError):
-                    await router_task
-                raise
-            self._print_timing("initial_commit", commit_started_at)
-            self._print_timing("initial_db", initial_db_started_at)
-
-            yield ChatStreamEvent(
-                "conversation",
-                {
-                    "conversation_id": conversation.id,
-                    "title": conversation.title,
-                    "message_id": user_message.id,
-                },
-            )
+                yield ChatStreamEvent("conversation", {"conversation_id": conversation.id, "title": conversation.title, "message_id": user_message.id})
+            else:
+                model_messages = [*(history or [])[-30:], ModelMessage(role="user", content=message)]
+            router_task = asyncio.create_task(self._execute_router_with_timing(model_messages))
 
             route_result = await router_task
             uses_rag = route_result.direct_response is None
@@ -130,6 +109,8 @@ class ReceiveMessageUseCase:
 
             if route_result.direct_response is not None:
                 assistant_content = route_result.direct_response
+                if response_mode == ResponseMode.SPEECH:
+                    assistant_content = await self._answer_generator.prepare_direct_speech(assistant_content)
                 yield ChatStreamEvent(
                     "delta",
                     {"content": assistant_content},
@@ -149,10 +130,16 @@ class ReceiveMessageUseCase:
                 result: AnswerResult | None = None
                 replier_started_at = perf_counter()
                 first_delta_received = False
-                async for answer_event in self._answer_generator.stream(
-                    route_result.user_question,
-                    parents,
-                ):
+                async def answer_events():
+                    if response_mode == ResponseMode.SPEECH:
+                        answer = await self._answer_generator.speech_answer(route_result.user_question, parents)
+                        yield AnswerDelta(answer.content)
+                        yield answer
+                    else:
+                        async for event in self._answer_generator.stream(route_result.user_question, parents):
+                            yield event
+
+                async for answer_event in answer_events():
                     if isinstance(answer_event, AnswerDelta):
                         if not first_delta_received:
                             first_delta_received = True
@@ -172,37 +159,22 @@ class ReceiveMessageUseCase:
                 assistant_content = result.content
                 sources = self._build_sources(parents, result.used_parent_ids)
 
-            final_persistence_started_at = perf_counter()
-            assistant_message = await self._message_repository.create(
-                Message.from_assistant(conversation.id, assistant_content),
-            )
-            if route_result.direct_response is None:
-                await self._persist_sources(assistant_message.id, parents, result.used_parent_ids)
-                if retrieval is None:
-                    raise RuntimeError("A auditoria do retrieval nao foi gerada.")
-                await self._persist_retrieval_audit(
-                    assistant_message.id,
-                    route_result.query or "",
-                    retrieval,
-                    result.used_parent_ids,
-                )
-            conversation.touch()
-            final_commit_started_at = perf_counter()
-            await self._unit_of_work.commit()
-            self._print_timing("final_commit", final_commit_started_at)
-            self._print_timing(
-                "final_persistence",
-                final_persistence_started_at,
-            )
-            logger.info(
-                "chat.total_elapsed_ms=%s conversation_id=%s",
-                round((perf_counter() - started_at) * 1000),
-                conversation.id,
-            )
+            assistant_id = generate_id()
+            if conversation is not None:
+                assistant_message = await self._message_repository.create(Message.from_assistant(conversation.id, assistant_content))
+                assistant_message.response_mode = response_mode.value
+                if response_mode == ResponseMode.SPEECH:
+                    assistant_message.playback_status = "pending"
+                assistant_id = assistant_message.id
+                if route_result.direct_response is None:
+                    await self._persist_sources(assistant_id, parents, result.used_parent_ids)
+                    await self._persist_retrieval_audit(assistant_id, route_result.query or "", retrieval, result.used_parent_ids)
+                conversation.touch()
+                await self._unit_of_work.commit()
             yield ChatStreamEvent(
                 "done",
                 {
-                    "message_id": assistant_message.id,
+                    "message_id": assistant_id,
                     "sources": sources,
                 },
             )
@@ -225,21 +197,31 @@ class ReceiveMessageUseCase:
                 with suppress(asyncio.CancelledError):
                     await router_task
 
+    async def update_playback(self, message_id: str, user_id: str, playback_status: str) -> None:
+        message = await self._message_repository.get_by_id(message_id)
+        if not message or message.response_mode != "speech":
+            raise ValueError("Resposta de chamada não encontrada.")
+        conversation = await self._conversation_repository.get_by_id(message.conversation_id)
+        if not conversation or conversation.user_id != user_id or conversation.expires_at <= datetime.now(UTC):
+            raise ValueError("Conversa não encontrada.")
+        message.playback_status = playback_status
+        await self._unit_of_work.commit()
+
     async def _create_or_get_conversation(
         self,
         conversation_id: str | None,
-        anonymous_id: str,
+        user_id: str,
         first_message: str,
     ) -> Conversation:
         if conversation_id:
             conversation = await self._conversation_repository.get_by_id(conversation_id)
 
-            if not conversation or conversation.anonymous_id != anonymous_id:
+            if not conversation or conversation.user_id != user_id or conversation.expires_at <= datetime.now(UTC):
                 raise ValueError("Conversa nao encontrada.")
 
             return conversation
 
-        conversation = Conversation.start(anonymous_id, first_message)
+        conversation = Conversation(user_id=user_id, anonymous_id=None, title=Conversation._build_title(first_message))
         await self._conversation_repository.create(conversation)
         return conversation
 
@@ -251,7 +233,7 @@ class ReceiveMessageUseCase:
         model_messages = [
             ModelMessage(
                 role="assistant" if item.author == MessageAuthor.AI.value else "user",
-                content=item.content,
+                content=item.content + ("\n[A leitura desta resposta não foi concluída pelo usuário.]" if getattr(item, "playback_status", None) in {"interrupted", "failed", "pending"} else ""),
             )
             for item in previous_messages
         ]
@@ -279,31 +261,9 @@ class ReceiveMessageUseCase:
             for index, parent in enumerate(selected, start=1)
         ])
 
-    def _build_sources(self, parents: list[RetrievedParent], used_ids: list[str]) -> list[dict[str, str]]:
-        sources: list[dict[str, str]] = []
-        seen_keys: set[str] = set()
-
-        for document in parents:
-            if document.id not in used_ids:
-                continue
-            url = document.source_url or ""
-            filename = document.filename.strip()
-            source_key = url or document.id
-
-            if source_key in seen_keys:
-                continue
-
-            seen_keys.add(source_key)
-            sources.append(
-                {
-                    "document_id": document.document_id,
-                    "filename": filename,
-                    "url": url,
-                    "source_type": document.source_type,
-                },
-            )
-
-        return sources
+    def _build_sources(self, parents: list[RetrievedParent], used_ids: list[str]) -> list[dict]:
+        from app.services.citations import group_citations
+        return group_citations([{"document_id": p.document_id, "filename": p.filename.strip(), "url": p.source_url, "source_type": p.source_type, "chunk_id": p.id, "bbox": p.bbox} for p in parents if p.id in used_ids])
 
     async def _persist_retrieval_audit(
         self,

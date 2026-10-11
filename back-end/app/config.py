@@ -27,6 +27,10 @@ class Settings:
 
     document_storage_dir: str
 
+    document_remote_base_url: str | None = None
+    groq_api_key: str | None = None
+    piper_model_path: str = "voices/pt_BR-faber-medium.onnx"
+
     @staticmethod
     def from_env() -> "Settings":
         return Settings(
@@ -49,6 +53,9 @@ class Settings:
             ),
             database_url=Settings._normalize_database_url(os.getenv("DATABASE_URL")),
             document_storage_dir=os.getenv("DOCUMENT_STORAGE_DIR", "downloads"),
+            document_remote_base_url=os.getenv("DOCUMENT_REMOTE_BASE_URL") or None,
+            groq_api_key=os.getenv("GROQ_API_KEY") or None,
+            piper_model_path=os.getenv("PIPER_MODEL_PATH", "voices/pt_BR-faber-medium.onnx"),
         )
 
     @staticmethod

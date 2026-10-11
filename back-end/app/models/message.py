@@ -19,6 +19,8 @@ class MessageAuthor(str, Enum):
 
 class Message(Base):
     __tablename__ = "messages"
+    response_mode: Mapped[str] = mapped_column(String(10), nullable=False, default="text", server_default="text")
+    playback_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
     id: Mapped[str] = mapped_column(
         String(9),

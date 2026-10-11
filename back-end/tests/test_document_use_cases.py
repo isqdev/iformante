@@ -46,7 +46,7 @@ class DocumentUseCaseTests(unittest.IsolatedAsyncioTestCase):
             document_ingestor=ingestor,
         )
 
-        actual_result = await use_case.execute("https://example.com/document.pdf")
+        actual_result = await use_case.execute("https://example.com/document.pdf", "admin1234")
 
         document = repository.create.await_args.args[0]
         self.assertEqual(actual_result, result)

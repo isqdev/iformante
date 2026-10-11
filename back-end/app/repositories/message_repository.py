@@ -37,7 +37,7 @@ class MessageRepository:
         conversation_id: str,
     ) -> list[Any]:
         result = await self._session.execute(
-            select(Message.author, Message.content)
+            select(Message.author, Message.content, Message.playback_status)
             .where(Message.conversation_id == conversation_id)
             .order_by(Message.created_at.asc()),
         )

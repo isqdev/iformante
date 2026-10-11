@@ -8,4 +8,8 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(password: str, hashed_password: str) -> bool:
-    return password_hash.verify(password, hashed_password)
+    from pwdlib.exceptions import UnknownHashError
+    try:
+        return password_hash.verify(password, hashed_password)
+    except (UnknownHashError, ValueError):
+        return False

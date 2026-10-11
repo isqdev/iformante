@@ -4,7 +4,7 @@ from sqlalchemy import case, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import RagDocumentChild, RagDocumentParent
+from app.models import RagDocumentChild, RagDocumentParent, Document
 
 
 @dataclass(frozen=True)
@@ -68,7 +68,8 @@ class RagRepository:
         )
         result = await self._session.execute(
             select(RagDocumentParent)
-            .where(RagDocumentParent.id.in_(parent_ids))
+            .join(Document, Document.id == RagDocumentParent.document_id)
+            .where(RagDocumentParent.id.in_(parent_ids), Document.ingestion_status == "INDEXED")
             .options(selectinload(RagDocumentParent.document))
             .order_by(ordering),
         )
@@ -87,6 +88,9 @@ class RagRepository:
                 RagDocumentChild.content,
                 (literal(1.0) - distance).label("vector_score"),
             )
+            .join(RagDocumentParent, RagDocumentParent.id == RagDocumentChild.parent_id)
+            .join(Document, Document.id == RagDocumentParent.document_id)
+            .where(Document.ingestion_status == "INDEXED")
             .order_by(distance)
             .limit(limit)
         )

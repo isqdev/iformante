@@ -6,7 +6,7 @@ from app.rag.ingestion import DocumentIngestor, IngestDocumentResult
 from app.repositories import DocumentRepository, UnitOfWork
 from app.services import DocumentStorage
 
-HARDCODED_DOCUMENT_UPLOADER_ID = "isaque123"
+
 
 
 class IngestDocumentUseCase:
@@ -22,11 +22,11 @@ class IngestDocumentUseCase:
         self._document_storage = document_storage
         self._document_ingestor = document_ingestor
 
-    async def execute(self, source_url: str) -> IngestDocumentResult:
+    async def execute(self, source_url: str, uploader_id: str) -> IngestDocumentResult:
         document = Document.start_ingestion(
             source_url=source_url,
             title=self._build_title(source_url),
-            uploaded_by=HARDCODED_DOCUMENT_UPLOADER_ID,
+            uploaded_by=uploader_id,
             source_type=DocumentSourceType.PDF,
             file_name=self._build_title(source_url),
         )

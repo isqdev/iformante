@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from enum import Enum
 
-from sqlalchemy import DateTime, String
+from sqlalchemy import Boolean, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import TYPE_CHECKING
 
@@ -41,6 +41,8 @@ class User(Base):
         String(255),
         nullable=False,
     )
+
+    email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     role: Mapped[str] = mapped_column(
         String(20),

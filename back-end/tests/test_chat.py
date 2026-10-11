@@ -20,9 +20,9 @@ from app.rag.models import ModelMessage
 class FakeReceiveMessageUseCase:
     is_configured = True
 
-    async def stream(self, conversation_id, anonymous_id, message) -> AsyncIterator[ChatStreamEvent]:
+    async def stream(self, conversation_id, anonymous_id, message, user_id=None, history=None) -> AsyncIterator[ChatStreamEvent]:
         yield ChatStreamEvent(
-            "conversation",
+            "temporary",
             {
                 "conversation_id": "chat12345",
                 "title": "Hello",
@@ -37,6 +37,8 @@ class FakeReceiveMessageUseCase:
 class ChatTests(unittest.TestCase):
     def setUp(self) -> None:
         app.dependency_overrides[get_receive_message_use_case] = FakeReceiveMessageUseCase
+        from app.security.dependencies import optional_current_user
+        app.dependency_overrides[optional_current_user] = lambda: None
         self.client = TestClient(app)
 
     def tearDown(self) -> None:
@@ -49,28 +51,17 @@ class ChatTests(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("event: conversation", response.text)
+        self.assertNotIn("event: conversation", response.text)
         self.assertIn("event: delta", response.text)
         self.assertIn("Hello", response.text)
         self.assertIn("world", response.text)
         self.assertIn("event: done", response.text)
-        self.assertIn(ANONYMOUS_COOKIE_NAME, response.headers["set-cookie"])
+        self.assertNotIn("set-cookie", response.headers)
 
-    def test_anonymous_cookie_uses_project_id_format(self) -> None:
-        response = self.client.post(
-            "/chat/stream",
-            json={"message": "Hello"},
-        )
-        cookie = response.cookies.get(ANONYMOUS_COOKIE_NAME)
-
-        self.assertIsNotNone(cookie)
-        self.assertEqual(len(cookie or ""), 9)
-        self.assertTrue(
-            all(
-                character in string.ascii_lowercase + string.digits
-                for character in cookie or ""
-            ),
-        )
+    def test_guest_does_not_receive_persistent_identity_cookie(self) -> None:
+        response = self.client.post("/chat/stream", json={"message": "Hello"})
+        self.assertIsNone(response.cookies.get(ANONYMOUS_COOKIE_NAME))
+        self.assertNotIn("set-cookie", response.headers)
 
     def test_chat_stream_rejects_empty_messages(self) -> None:
         response = self.client.post(

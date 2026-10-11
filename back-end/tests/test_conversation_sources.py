@@ -10,11 +10,13 @@ class ConversationSourcesTests(unittest.TestCase):
             source_url="https://example.com/document.pdf",
             file_name="document.pdf",
             title="Document",
+            ingestion_status="INDEXED",
+            source_type="PDF",
         )
         message = SimpleNamespace(
             sources=[
-                SimpleNamespace(document=document),
-                SimpleNamespace(document=document),
+                SimpleNamespace(document=document, document_id="doc123456", chunk_id="chunk1234", bbox=[{"page":1}]),
+                SimpleNamespace(document=document, document_id="doc123456", chunk_id="chunk1234", bbox=[{"page":1}]),
             ],
         )
 
@@ -24,6 +26,9 @@ class ConversationSourcesTests(unittest.TestCase):
             [source.model_dump() for source in sources],
             [
                 {
+                    "document_id": "doc123456",
+                    "source_type": "PDF",
+                    "citations": [{"chunk_id": "chunk1234", "anchors": [{"page": 1}]}],
                     "filename": "document.pdf",
                     "url": "https://example.com/document.pdf",
                 },

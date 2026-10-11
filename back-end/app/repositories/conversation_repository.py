@@ -1,4 +1,5 @@
 from sqlalchemy import select
+from datetime import UTC, datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Conversation
@@ -19,7 +20,7 @@ class ConversationRepository:
     async def list_by_user(self, user_id: str) -> list[Conversation]:
         result = await self._session.execute(
             select(Conversation)
-            .where(Conversation.user_id == user_id)
+            .where(Conversation.user_id == user_id, Conversation.expires_at > datetime.now(UTC))
             .order_by(Conversation.updated_at.desc()),
         )
         return list(result.scalars().all())

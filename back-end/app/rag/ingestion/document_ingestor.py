@@ -16,6 +16,7 @@ from langchain_text_splitters import (
 from app.models import RagDocumentChild, RagDocumentParent, generate_id
 from app.repositories import RagRepository
 from app.services import DocumentStorage
+from app.services.pdf_anchors import chunk_anchors
 
 PARENT_LIMIT = 1024
 CHILD_MIN = 128
@@ -136,7 +137,7 @@ class DocumentIngestor:
                 id=parent.metadata["parent_id"],
                 document_id=document_id,
                 content=parent.page_content,
-                bbox=[{"page": parent.metadata["page"]}],
+                bbox=chunk_anchors(pdf_path, parent.metadata["page"], parent.page_content),
                 chunk_index=index,
                 token_count=self._parent_splitter._length_function(parent.page_content),
             )

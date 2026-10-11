@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, String
@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
 class Conversation(Base):
     __tablename__ = "conversations"
+    channel: Mapped[str] = mapped_column(String(10), nullable=False, default="text", server_default="text")
     __table_args__ = (
         CheckConstraint(
             "user_id IS NOT NULL OR anonymous_id IS NOT NULL",
@@ -59,6 +60,11 @@ class Conversation(Base):
         Boolean,
         nullable=False,
         default=False,
+    )
+
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        default=lambda: datetime.now(UTC) + timedelta(days=7), index=True,
     )
 
     user: Mapped["User | None"] = relationship(
