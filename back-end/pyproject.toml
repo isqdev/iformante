@@ -21,4 +21,7 @@ dependencies = [
     "sqlalchemy>=2.0.45",
     "tiktoken>=0.13.0",
     "uvicorn>=0.40.0",
+    "cryptography>=45",
+    "piper-tts[alignment]==1.8.0",
+    "num2words>=0.5.14",
 ]
