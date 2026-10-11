@@ -1,9 +1,15 @@
 "use client";
 
-import {useRef, useState, type DragEvent, type FormEvent} from "react";
-import {FileText, Globe, Upload} from "lucide-react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type DragEvent,
+  type FormEvent,
+} from "react";
+import { FileText, Globe, Upload } from "lucide-react";
 
-import {Button} from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogClose,
@@ -13,12 +19,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {Field, FieldDescription, FieldLabel} from "@/components/ui/field";
-import {Input} from "@/components/ui/input";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+
+import { ifprUrl, type DroppedSource } from "./documents/useDocumentDrop";
 
 type SourceKind = "pdf" | "web-page";
 
 type DocumentModalProps = {
+  initialSource?: DroppedSource | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };
@@ -27,7 +36,11 @@ function filenameWithoutExtension(filename: string) {
   return filename.replace(/\.pdf$/i, "");
 }
 
-export function DocumentModal({open, onOpenChange}: DocumentModalProps) {
+export function DocumentModal({
+  open,
+  onOpenChange,
+  initialSource,
+}: DocumentModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [sourceKind, setSourceKind] = useState<SourceKind | null>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -36,6 +49,33 @@ export function DocumentModal({open, onOpenChange}: DocumentModalProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || !initialSource) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setSourceKind(initialSource.file ? "pdf" : "web-page");
+      setFile(initialSource.file ?? null);
+      setUrl(initialSource.url ?? "");
+      setTitle(initialSource.title ?? "");
+      setError(null);
+    });
+    if (initialSource.url)
+      void fetch("/api/documents/metadata", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: initialSource.url }),
+      })
+        .then((r) => r.json())
+        .then((r) => {
+          if (!cancelled && r.title) setTitle(r.title);
+        })
+        .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [open, initialSource]);
 
   function resetForm() {
     setSourceKind(null);
@@ -83,7 +123,7 @@ export function DocumentModal({open, onOpenChange}: DocumentModalProps) {
       }
     }
 
-    if (sourceKind === "web-page" && !url.trim()) {
+    if (sourceKind === "web-page" && !ifprUrl(url.trim())) {
       setError("Informe o link da página do IFPR.");
       return;
     }
@@ -101,18 +141,30 @@ export function DocumentModal({open, onOpenChange}: DocumentModalProps) {
               const formData = new FormData();
               formData.append("file", file!);
               formData.append("title", title.trim());
-              return fetch("/api/documents", {method: "POST", body: formData});
+              return fetch("/api/documents", {
+                method: "POST",
+                body: formData,
+              });
             })()
           : await fetch("/api/documents", {
               method: "POST",
-              headers: {"Content-Type": "application/json"},
-              body: JSON.stringify({kind: "web-page", url: url.trim()}),
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                kind: "web-page",
+                url: url.trim(),
+                title: title.trim() || undefined,
+              }),
             });
 
-      const payload = (await response.json()) as {detail?: string; error?: string};
+      const payload = (await response.json()) as {
+        detail?: string;
+        error?: string;
+      };
       if (!response.ok) {
         throw new Error(
-          payload.detail ?? payload.error ?? "Não foi possível adicionar a fonte.",
+          payload.detail ??
+            payload.error ??
+            "Não foi possível adicionar a fonte.",
         );
       }
 
@@ -131,7 +183,7 @@ export function DocumentModal({open, onOpenChange}: DocumentModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-auto sm:max-w-lg">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Nova fonte</DialogTitle>
@@ -142,7 +194,11 @@ export function DocumentModal({open, onOpenChange}: DocumentModalProps) {
 
           <div className="grid gap-5 py-5">
             {!sourceKind ? (
-              <div role="group" aria-label="Tipo de fonte" className="grid grid-cols-2 gap-3">
+              <div
+                role="group"
+                aria-label="Tipo de fonte"
+                className="grid grid-cols-2 gap-3"
+              >
                 <Button
                   type="button"
                   variant="outline"
@@ -188,9 +244,15 @@ export function DocumentModal({open, onOpenChange}: DocumentModalProps) {
                     onDrop={handleDrop}
                   >
                     <Upload className="size-6" />
-                    <span>{file ? file.name : "Arraste um PDF ou clique para selecionar"}</span>
+                    <span className="max-w-full truncate">
+                      {file
+                        ? file.name
+                        : "Arraste um PDF ou clique para selecionar"}
+                    </span>
                   </Button>
-                  <FieldDescription>Arquivos PDF de até 25 MB.</FieldDescription>
+                  <FieldDescription>
+                    Arquivos PDF de até 25 MB.
+                  </FieldDescription>
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="document-title">Título</FieldLabel>
@@ -206,19 +268,31 @@ export function DocumentModal({open, onOpenChange}: DocumentModalProps) {
                 </Field>
               </>
             ) : (
-              <Field>
-                <FieldLabel htmlFor="document-url">Link da página</FieldLabel>
-                <Input
-                  id="document-url"
-                  type="url"
-                  value={url}
-                  onChange={(event) => setUrl(event.target.value)}
-                  placeholder="https://ifpr.edu.br/..."
-                />
-                <FieldDescription>
-                  Apenas páginas do domínio ifpr.edu.br. O título será extraído da página.
-                </FieldDescription>
-              </Field>
+              <>
+                <Field>
+                  <FieldLabel htmlFor="document-url">Link da página</FieldLabel>
+                  <Input
+                    id="document-url"
+                    type="url"
+                    value={url}
+                    onChange={(event) => setUrl(event.target.value)}
+                    placeholder="https://ifpr.edu.br/..."
+                  />
+                  <FieldDescription>
+                    Apenas páginas do domínio ifpr.edu.br. O título será
+                    extraído da página.
+                  </FieldDescription>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="web-title">Título (opcional)</FieldLabel>
+                  <Input
+                    id="web-title"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    maxLength={255}
+                  />
+                </Field>
+              </>
             )}
 
             {error && <p className="text-sm text-destructive">{error}</p>}

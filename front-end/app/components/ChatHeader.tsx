@@ -11,7 +11,7 @@ type ChatHeaderProps = {
 
 export function ChatHeader({isLoading = false, title}: ChatHeaderProps) {
   return (
-    <header className="relative flex h-14 items-center justify-center border-b px-4 md:px-6">
+    <header className="relative flex h-14 shrink-0 items-center justify-center border-b px-4 md:px-6">
       <SidebarTrigger
         aria-label="Abrir menu lateral"
         className="absolute left-4"

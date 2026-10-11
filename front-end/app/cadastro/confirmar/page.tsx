@@ -1,0 +1,2 @@
+import {ConfirmationForm} from "@/app/components/auth/ConfirmationForm";
+export default async function Page({searchParams}: {searchParams: Promise<{registration?: string}>}) { const {registration} = await searchParams; return <ConfirmationForm registration={registration ?? ""} />; }

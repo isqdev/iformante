@@ -1,6 +1,2 @@
-import {DocumentsPage} from "../documents-page";
-
-export default async function DocumentPage({params}: {params: Promise<{documentId: string}>}) {
-  const {documentId} = await params;
-  return <DocumentsPage documentId={documentId} />;
-}
+import {redirect} from "next/navigation";
+export default async function Page({params}: {params: Promise<{documentId: string}>}) {const {documentId} = await params; redirect(`/docs?document=${encodeURIComponent(documentId)}`);}

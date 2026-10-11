@@ -11,9 +11,11 @@ import {
 } from "react";
 import {usePathname, useRouter} from "next/navigation";
 
+import {useAuth} from "../auth/AuthProvider";
 import type {Conversation} from "../../models/conversation";
 
 type ConversationSummary = {
+  channel?: "text" | "speech";
   id: string;
   title: string;
 };
@@ -40,6 +42,7 @@ type SidebarContextValue = {
 const SidebarContext = createContext<SidebarContextValue | null>(null);
 
 export function SidebarProvider({children}: {children: ReactNode}) {
+  const {user, loading} = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -50,6 +53,7 @@ export function SidebarProvider({children}: {children: ReactNode}) {
   const [newConversationVersion, setNewConversationVersion] = useState(0);
 
   const refreshConversations = useCallback(async (showLoading = false) => {
+    if (!user) { setConversations([]); setIsLoadingConversations(false); return; }
     if (showLoading) {
       setIsLoadingConversations(true);
     }
@@ -80,11 +84,11 @@ export function SidebarProvider({children}: {children: ReactNode}) {
         setIsLoadingConversations(false);
       }
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
-    queueMicrotask(() => void refreshConversations(true));
-  }, [refreshConversations]);
+    if (!loading) queueMicrotask(() => void refreshConversations(true));
+  }, [refreshConversations, loading]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -136,7 +140,8 @@ export function SidebarProvider({children}: {children: ReactNode}) {
         }
 
         setActiveConversationId(conversationId);
-        router.push(`/c/${conversationId}`);
+        const conversation = conversations.find((item) => item.id === conversationId);
+        router.push(conversation?.channel === "speech" ? `/call?conversation=${conversationId}` : `/c/${conversationId}`);
       },
       setActiveConversationId,
       startNewConversation: () => {

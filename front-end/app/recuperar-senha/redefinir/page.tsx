@@ -1,0 +1,2 @@
+import {PasswordForm} from "@/app/components/auth/PasswordForm";
+export default async function Page({searchParams}: {searchParams: Promise<{token?: string}>}) {const {token} = await searchParams; return <PasswordForm mode="reset" token={token} />; }

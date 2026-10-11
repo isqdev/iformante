@@ -3,7 +3,6 @@
 import {type ClipboardEvent, useEffect, useRef, useState} from "react";
 import {
   Copy,
-  FaceRobot,
   FileText,
 } from "@gravity-ui/icons";
 import {Globe, SquareArrowOutUpRight} from "lucide-react";
@@ -16,6 +15,7 @@ import {
   BubbleReactions,
 } from "@/components/ui/bubble";
 import {Button} from "@/components/ui/button";
+import {BrandLogo} from "./BrandLogo";
 import {
   Card,
   CardContent,
@@ -102,7 +102,7 @@ function StreamingStatus({showMessage}: {showMessage: boolean}) {
     const initialIndex = Math.floor(
       Math.random() * STREAMING_STATUS_MESSAGES.length,
     );
-    setMessageIndex(initialIndex);
+    queueMicrotask(() => setMessageIndex(initialIndex));
     remainingMessageIndexes.current = createShuffledMessageIndexes(initialIndex);
 
     let displayTimeout: ReturnType<typeof setTimeout> | undefined;
@@ -220,8 +220,8 @@ export function ChatMessages({messages, onOpenSource}: ChatMessagesProps) {
                               className="mt-4 before:bg-source-card-border after:bg-source-card-border"
                               variant="separator"
                             >
-                              <MarkerIcon className="text-source-card-border">
-                                <FaceRobot />
+                              <MarkerIcon className="size-12 text-source-card-border">
+                                <BrandLogo size={48} className="size-12" />
                               </MarkerIcon>
                             </Marker>
                             <Card className="mt-6 w-full border border-source-card-border bg-transparent font-serif ring-0">

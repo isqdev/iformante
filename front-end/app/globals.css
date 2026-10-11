@@ -4,6 +4,15 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* The detailed portrait is scoped to the call page. */
+.call-avatar-stage { aspect-ratio: 1; }
+.call-avatar { position: relative; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 14px 22px rgb(0 0 0 / 0.10)); }
+.call-avatar-halo { position: absolute; inset: 12%; border-radius: 50%; background: radial-gradient(circle, var(--muted) 0%, transparent 72%); }
+.call-stage { padding-block: 1rem; }
+@media (max-height: 800px) and (min-width: 1280px) { .call-avatar-stage { max-width: 290px; } .call-stage { gap: 0.75rem; padding-block: 0; } }
+@media (max-width: 1279px) { .call-avatar-stage { max-width: 280px; } }
+@media (prefers-reduced-motion: reduce) { .call-page * { scroll-behavior: auto; } }
+
 html,
 body {
   min-height: 100%;
@@ -37,6 +46,9 @@ body {
 }
 
 @theme inline {
+  --color-sidebar-selected: var(--sidebar-selected);
+  --color-source-button: var(--source-button);
+  --color-source-button-active: var(--source-button-active);
   --font-heading: var(--font-sora), Arial, sans-serif;
   --font-sans: var(--font-sora), Arial, sans-serif;
   --font-serif: var(--font-radley), Georgia, serif;
@@ -83,6 +95,9 @@ body {
 }
 
 :root {
+  --sidebar-selected: var(--sidebar-accent);
+  --source-button: var(--accent);
+  --source-button-active: var(--muted);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -104,8 +119,8 @@ body {
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
-  --skeleton: oklch(0.72 0.08 156.45);
-  --source-card-border: oklch(0.55 0 0);
+  --skeleton: oklch(0.922 0 0);
+  --source-card-border: var(--border);
   --document-status-pending: oklch(0.78 0.16 68);
   --document-status-processing: oklch(0.88 0.16 95);
   --document-status-indexed: oklch(0.72 0.15 150);
@@ -117,7 +132,7 @@ body {
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
-  --sidebar: color-mix(in oklch, var(--background) 66%, transparent);
+  --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
   --sidebar-primary-foreground: oklch(0.985 0 0);
@@ -128,6 +143,9 @@ body {
 }
 
 .dark {
+  --sidebar-selected: color-mix(in oklch, var(--primary) 15%, transparent);
+  --source-button: color-mix(in oklch, var(--primary) 15%, transparent);
+  --source-button-active: color-mix(in oklch, var(--primary) 25%, transparent);
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -201,7 +219,21 @@ body {
 }
 
 @layer components {
+  /* PDF controls keep the same contrast in both application themes. */
+  .pdf-toolbar {
+    --background: oklch(0 0 0);
+    --foreground: oklch(1 0 0);
+    --muted: oklch(0.3 0 0);
+    --input: oklch(0.4 0 0);
+    --border: oklch(0.4 0 0);
+    --ring: var(--primary);
+  }
+
   .app-glass-background {
+    background-color: var(--background);
+  }
+
+  .dark .app-glass-background {
     background-color: var(--background);
     background-image: radial-gradient(
       ellipse 156% 160% at 50% -8%,
@@ -218,6 +250,10 @@ body {
   }
 
   .chat-glass-input {
+    background-color: var(--background);
+  }
+
+  .dark .chat-glass-input {
     background-color: color-mix(
       in oklch,
       var(--input) 30%,

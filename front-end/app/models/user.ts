@@ -1,4 +1,1 @@
-export type User = {
-  name: string;
-  role: string;
-};
+export type User = {id: string; first_name: string; role: "COMMON" | "ADMIN"};
