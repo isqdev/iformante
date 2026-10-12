@@ -30,6 +30,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
   useEffect(() => {
     queueMicrotask(() => void refresh());
+    const focused = () => { void refresh(); };
+    window.addEventListener("focus", focused);
+    return () => window.removeEventListener("focus", focused);
   }, [refresh]);
   async function logout() {
     await authRequest("logout");
