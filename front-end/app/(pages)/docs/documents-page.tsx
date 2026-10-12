@@ -17,9 +17,10 @@ import { DocumentsSkeleton } from "../../components/documents/DocumentsSkeleton"
 import type { DocumentItem } from "../../components/documents/types";
 import { useAuth } from "../../components/auth/AuthProvider";
 import { useDocumentQuery } from "../../hooks/useDocumentQuery";
+import { isAdmin } from "@/lib/permissions";
 export function DocumentsPage() {
   const { user } = useAuth();
-  const admin = user?.role === "ADMIN";
+  const admin = isAdmin(user);
   const [documentId, selectDocument] = useDocumentQuery();
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);

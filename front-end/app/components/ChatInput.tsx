@@ -2,7 +2,7 @@
 
 import {useEffect, useRef, useState} from "react";
 import {toast} from "sonner";
-import {Microphone, PaperPlane, Xmark} from "@gravity-ui/icons";
+import {Mic, Send, X} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {
   InputGroup,
@@ -129,7 +129,7 @@ export function ChatInput({
               className="flex min-h-12 min-w-0 flex-1 items-center gap-3 px-2"
               role="status"
             >
-              <Microphone className="shrink-0" />
+              <Mic className="shrink-0" />
               <AudioVisualizer active={speechRecognition.isListening} />
               <span className="sr-only" aria-live="polite">
                 {speechRecognition.transcript || "Pode falar"}
@@ -160,7 +160,7 @@ export function ChatInput({
                 variant="outline"
                 onClick={handleCancelVoiceInput}
               >
-                <Xmark />
+                <X />
               </Button>
               <Tooltip>
                 <TooltipTrigger
@@ -172,7 +172,7 @@ export function ChatInput({
                       variant="default"
                       onClick={handleSubmitVoiceInput}
                     >
-                      <PaperPlane />
+                      <Send />
                     </Button>
                   }
                 />
@@ -195,7 +195,7 @@ export function ChatInput({
                       variant="outline"
                       onClick={handleStartVoiceInput}
                     >
-                      <Microphone />
+                      <Mic />
                     </Button>
                   }
                 />
@@ -213,7 +213,7 @@ export function ChatInput({
                     variant="default"
                     onClick={handleSend}
                   >
-                    <PaperPlane />
+                    <Send />
                   </Button>
                 }
               />

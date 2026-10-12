@@ -1,6 +1,6 @@
 "use client";
 
-import {Microphone, Xmark} from "@gravity-ui/icons";
+import {Mic, X} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {
   Dialog,
@@ -48,11 +48,11 @@ export function VoiceInputModal({
           variant="ghost"
           onClick={onCancel}
         >
-          <Xmark />
+          <X />
         </Button>
 
         <div className="flex w-full max-w-3xl flex-col items-center gap-8 px-6 text-center">
-          <Microphone
+          <Mic
             aria-hidden="true"
             className={isListening ? "size-16 animate-pulse" : "size-16 opacity-60"}
           />

@@ -1,11 +1,7 @@
 "use client";
 
 import {type ClipboardEvent, useEffect, useRef, useState} from "react";
-import {
-  Copy,
-  FileText,
-} from "@gravity-ui/icons";
-import {Globe, SquareArrowOutUpRight} from "lucide-react";
+import {Copy, FileText, Globe, SquareArrowOutUpRight} from "lucide-react";
 import {Bouncy} from "ldrs/react";
 import {toast} from "sonner";
 import "ldrs/react/Bouncy.css";

@@ -3,6 +3,7 @@
 import {useCallback, useState} from "react";
 import {usePathname, useRouter} from "next/navigation";
 import {useAuth} from "../auth/AuthProvider";
+import {isAdmin} from "@/lib/permissions";
 
 import {DropOverlay} from "../documents/DropOverlay";
 import {useDocumentDrop, type DroppedSource} from "../documents/useDocumentDrop";
@@ -21,7 +22,7 @@ export function AppSidebar() {
 
   const [initialSource, setInitialSource] = useState<DroppedSource | null>(null);
   const acceptDrop = useCallback((source: DroppedSource) => {setInitialSource(source); setIsDocumentOpen(true);}, []);
-  const recognized = useDocumentDrop(currentUser?.role === "ADMIN", acceptDrop);
+  const recognized = useDocumentDrop(isAdmin(currentUser), acceptDrop);
 
   return (
     <>
@@ -35,6 +36,8 @@ export function AppSidebar() {
         onOpenDocuments={sidebar.openDocuments}
         onOpenCall={() => router.push("/call")}
         isCallActive={pathname === "/call"}
+        onOpenSystem={() => router.push("/system")}
+        isSystemActive={pathname === "/system"}
         onNewDocument={() => {setInitialSource(null); setIsDocumentOpen(true);}}
         onNewConversation={sidebar.startNewConversation}
         onOpenSettings={() => currentUser ? setIsSettingsOpen(true) : router.push("/login")}
@@ -42,7 +45,7 @@ export function AppSidebar() {
       />
 
       {recognized && <DropOverlay />}
-      {currentUser?.role === "ADMIN" && <DocumentModal initialSource={initialSource} open={isDocumentOpen} onOpenChange={setIsDocumentOpen} />}
+      {isAdmin(currentUser) && <DocumentModal initialSource={initialSource} open={isDocumentOpen} onOpenChange={setIsDocumentOpen} />}
       {currentUser && <SettingsModal
         open={isSettingsOpen}
         user={currentUser}

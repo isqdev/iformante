@@ -1,7 +1,7 @@
 "use client";
 
-import {FilePlus, FileText, Pencil} from "@gravity-ui/icons";
-import {Phone} from "lucide-react";
+import {FilePlus, FileText, Pencil, Phone, Settings2} from "lucide-react";
+import {isAdmin, canNavigateFromSystem} from "@/lib/permissions";
 import {BrandLogo} from "../BrandLogo";
 import {Avatar, AvatarFallback} from "@/components/ui/avatar";
 import {Skeleton} from "@/components/ui/skeleton";
@@ -33,6 +33,8 @@ type SidebarProps = {
   onOpenDocuments: () => void;
   onOpenCall: () => void;
   isCallActive: boolean;
+  onOpenSystem: () => void;
+  isSystemActive: boolean;
   onNewDocument: () => void;
   onNewConversation: () => void;
   onOpenSettings: () => void;
@@ -49,6 +51,8 @@ export function Sidebar({
   onOpenDocuments,
   onOpenCall,
   isCallActive,
+  onOpenSystem,
+  isSystemActive,
   onNewDocument,
   onNewConversation,
   onOpenSettings,
@@ -56,7 +60,8 @@ export function Sidebar({
 }: SidebarProps) {
   const {setOpenMobile} = useUiSidebar();
 
-  function runAndCloseMobile(action: () => void) {
+  function runAndCloseMobile(action: () => void, navigates = false) {
+    if (navigates && !canNavigateFromSystem()) return;
     action();
     setOpenMobile(false);
   }
@@ -77,7 +82,7 @@ export function Sidebar({
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton isActive={isCallActive} tooltip="Chamada" onClick={() => runAndCloseMobile(onOpenCall)}>
+                <SidebarMenuButton isActive={isCallActive} tooltip="Chamada" onClick={() => runAndCloseMobile(onOpenCall, true)}>
                   <Phone />
                   <span>Chamada</span>
                 </SidebarMenuButton>
@@ -86,13 +91,13 @@ export function Sidebar({
                 <SidebarMenuButton
                   isActive={isNewConversationActive}
                   tooltip="Nova conversa"
-                  onClick={() => runAndCloseMobile(onNewConversation)}
+                  onClick={() => runAndCloseMobile(onNewConversation, true)}
                 >
                   <Pencil />
                   <span>Nova conversa</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              {currentUser?.role === "ADMIN" && (              <SidebarMenuItem>
+              {isAdmin(currentUser) && (              <SidebarMenuItem>
                 <SidebarMenuButton
                   tooltip="Novo documento"
                   onClick={() => runAndCloseMobile(onNewDocument)}
@@ -104,12 +109,20 @@ export function Sidebar({
               <SidebarMenuItem>
                 <SidebarMenuButton
                   tooltip="Documentos"
-                  onClick={() => runAndCloseMobile(onOpenDocuments)}
+                  onClick={() => runAndCloseMobile(onOpenDocuments, true)}
                 >
                   <FileText />
                   <span>Documentos</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              {currentUser?.role === "SUPER" && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton isActive={isSystemActive} tooltip="Sistema" onClick={() => runAndCloseMobile(onOpenSystem, !isSystemActive)}>
+                    <Settings2 />
+                    <span>Sistema</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -131,7 +144,7 @@ export function Sidebar({
                         tooltip={conversation.title}
                         onClick={() =>
                           runAndCloseMobile(() =>
-                            onSelectConversation(conversation.id),
+                            onSelectConversation(conversation.id), true,
                           )
                         }
                       >

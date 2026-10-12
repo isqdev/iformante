@@ -60,7 +60,7 @@ export function SettingsModal({
         <DialogHeader>
           <DialogTitle>{user.first_name}</DialogTitle>
           <DialogDescription>
-            {user.role === "ADMIN" ? "Admin" : "Estudante"}
+            {user.role === "SUPER" ? "SUPER" : user.role === "ADMIN" ? "Admin" : "Estudante"}
           </DialogDescription>
         </DialogHeader>
         <Field>
