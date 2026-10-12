@@ -1,4 +1,4 @@
-"""One-time admin bootstrap. Password is entered securely, never stored in source."""
+"""Initial SUPER bootstrap. Existing verified accounts keep their password and role."""
 import asyncio
 import getpass
 from sqlalchemy import select
@@ -19,13 +19,13 @@ async def main():
         if user is None:
             user = User(id="isaque123", name="Isaque", email="20230006245@estudantes.ifpr.edu.br")
             session.add(user)
-        elif user.email_verified and user.role == "ADMIN" and user.email == "20230006245@estudantes.ifpr.edu.br":
+        elif user.email_verified and user.role in {"ADMIN", "SUPER"} and user.email == "20230006245@estudantes.ifpr.edu.br":
             print("Conta já provisionada; senha preservada.")
             return
         user.email = "20230006245@estudantes.ifpr.edu.br"
-        user.role, user.email_verified, user.password_hash = "ADMIN", True, hash_password(password)
+        user.role, user.email_verified, user.password_hash = "SUPER", True, hash_password(password)
         await session.commit()
-    print("Admin provisionado.")
+    print("SUPER provisionado.")
 
 
 if __name__ == "__main__":

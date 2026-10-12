@@ -1,12 +1,19 @@
 # Voice used by the Chamada module
 
-Engine: Piper (`piper-tts`), GPL-3.0. See https://github.com/OHF-Voice/piper1-gpl.
+Model: Kyutai Pocket TTS, Portuguese, public catalog-only weights, CC-BY-4.0.
+Model and license: https://huggingface.co/kyutai/pocket-tts-without-voice-cloning.
+Source revision: `575d14372df89a4534bcb989870a34e77544b09f`.
 
-Voice: `pt_BR-faber-medium`, Brazilian Portuguese, medium quality, 22,050 Hz.
-Source revision: `rhasspy/piper-voices@2f8dbe0`.
-Dataset license recorded in the voice model card: CC0.
-Model repository: https://huggingface.co/rhasspy/piper-voices.
-Model card: https://huggingface.co/rhasspy/piper-voices/blob/main/pt/pt_BR/faber/medium/MODEL_CARD.
+Voice: George, with the state precomputed for the Portuguese model.
+Original reference: VCTK `p315_023_enhanced.wav` (English recording), CC-BY-4.0.
+Voice catalog and attribution: https://huggingface.co/kyutai/tts-voices.
+Output: mono PCM16, 24,000 Hz. Text uses Portuguese model tokenization;
+Brazilian numbers, dates and abbreviations are normalized before synthesis.
 
-The installation script verifies the checksums published in the voice index. Models
-are downloaded during setup/build and are not committed to this repository.
+Runtime: `pocket-tts` 3.3.0, MIT, using PyTorch on CPU.
+Source and license: https://github.com/kyutai-labs/pocket-tts.
+
+The installer downloads the Portuguese model, tokenizer and George voice state
+from the pinned public model revision. It checks SHA-256 before replacing files
+and writes a configuration referencing only those local assets.
+Downloaded models and generated configurations are not committed to Git.
