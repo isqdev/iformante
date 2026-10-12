@@ -9,7 +9,7 @@ import { useCall, type CallState } from "../../hooks/useCall";
 import { PageContainer } from "../PageContainer";
 import { ChatHeader } from "../ChatHeader";
 import { InformanteAvatar } from "./InformanteAvatar";
-import { DocumentDialogPreview, type PreviewDocument } from "../DocumentPreview";
+import { DocumentPreview, type PreviewDocument } from "../DocumentPreview";
 import type { MessageSource } from "../../models/message";
 
 const labels: Record<CallState, string> = {
@@ -27,7 +27,7 @@ export function CallPage() {
   const hint = call.hint || call.configurationHint;
 
   function openSource(source: MessageSource) {
-    // Match /docs: PDFs use the fullscreen viewer; web sources open their URL.
+    // PDFs keep the response citations; web sources open their URL.
     if (source.source_type === "WEB_PAGE" && source.url) {
       window.open(source.url, "_blank", "noopener,noreferrer");
       return;
@@ -80,7 +80,7 @@ export function CallPage() {
           </section>
         </div>
       </main>
-      <DocumentDialogPreview document={preview} onClose={() => setPreview(null)} />
+      <DocumentPreview document={preview} onClose={() => setPreview(null)} />
     </PageContainer>
   );
 }

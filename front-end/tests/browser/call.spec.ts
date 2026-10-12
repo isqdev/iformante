@@ -8,10 +8,12 @@ declare global {
 }
 
 function audioEvents(seconds = 2, sources: MessageSource[] = []) {
-  const pcm = Buffer.alloc(22050 * seconds * 2);
-  for (let i = 0; i < pcm.length / 2; i++) pcm.writeInt16LE(Math.round(Math.sin(i * 2 * Math.PI * 180 / 22050) * 8000), i * 2);
+  // Pocket TTS emits 24 kHz mono audio without phoneme timings.
+  const sampleRate = 24000;
+  const pcm = Buffer.alloc(sampleRate * seconds * 2);
+  for (let i = 0; i < pcm.length / 2; i++) pcm.writeInt16LE(Math.round(Math.sin(i * 2 * Math.PI * 180 / sampleRate) * 8000), i * 2);
   const event = (name: string, data: object) => `event: ${name}\ndata: ${JSON.stringify(data)}\n\n`;
-  return event("state", { value: "transcribing" }) + event("transcript", { text: "Olá, InFormante." }) + event("answer", { text: "Olá! Como posso ajudar?", message_id: "msgai0001", sources }) + event("state", { value: "speaking" }) + event("audio_format", { sample_rate: 22050, channels: 1, sample_width: 2 }) + event("alignment", { items: [{ phoneme: "a", start: 0, duration: seconds }] }) + event("audio", { sequence: 0, data: pcm.toString("base64") }) + event("audio_done", { samples: pcm.length / 2 }) + event("done", { message_id: "msgai0001", sources });
+  return event("state", { value: "transcribing" }) + event("transcript", { text: "Olá, InFormante." }) + event("answer", { text: "Olá! Como posso ajudar?", message_id: "msgai0001", sources }) + event("state", { value: "speaking" }) + event("audio_format", { sample_rate: sampleRate, channels: 1, sample_width: 2 }) + event("audio", { sequence: 0, data: pcm.toString("base64") }) + event("audio_done", { samples: pcm.length / 2 }) + event("done", { message_id: "msgai0001", sources });
 }
 
 async function fixture(page: Page, seconds = 2, micFailures = 0, options: { sources?: MessageSource[]; signedIn?: boolean; responseGate?: Promise<void> } = {}) {
@@ -239,12 +241,46 @@ test("PDF sources use the same fullscreen viewer as /docs", async ({ page }) => 
   await expect(page.locator("main.call-page")).toHaveAttribute("data-state", "ready");
   await page.getByRole("button", { name: "Documento.pdf" }).click();
   await expect(page.getByLabel("Página atual")).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole("button", { name: "Ver citações", exact: true })).toBeVisible();
   const dialog = await page.getByRole("dialog").boundingBox();
   expect(dialog?.width).toBe(390);
   expect(dialog?.height).toBe(844);
   await page.getByRole("dialog").focus();
   await page.keyboard.press("Space");
   expect(count.uploads()).toBe(1);
+  await page.getByLabel("Fechar visualizador").click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
+test("call PDF toolbar navigates response citations and returns to page tools", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await fixture(page, 1, 0, { sources: [{
+    document_id: "doc123456", filename: "Documento citado.pdf", source_type: "PDF", url: null,
+    citations: [
+      { chunk_id: "chunk0001", anchors: [{ page: 1, x: 0.1, y: 0.12, width: 0.6, height: 0.03 }] },
+      { chunk_id: "chunk0002", anchors: [{ page: 3, x: 0.1, y: 0.12, width: 0.6, height: 0.03 }] },
+    ],
+  }] });
+  await record(page, false);
+  await expect(page.locator("main.call-page")).toHaveAttribute("data-state", "ready");
+  await page.getByRole("button", { name: "Documento citado.pdf", exact: true }).click();
+  await expect(page.locator('[data-pdf-page="1"] > [aria-hidden="true"]')).toHaveCount(1);
+  await expect(page.locator('[data-pdf-page="3"] > [aria-hidden="true"]')).toHaveCount(1);
+  await page.getByRole("button", { name: "Ver citações", exact: true }).click();
+  const toolbar = page.getByRole("toolbar", { name: "Navegação das citações" });
+  await expect(toolbar).toContainText("1 / 2 citações");
+  await expect(page.getByRole("button", { name: "Citação anterior", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: "Próxima citação", exact: true }).click();
+  await expect(toolbar).toContainText("2 / 2 citações");
+  await expect(page.getByRole("button", { name: "Próxima citação", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: "Configurações do PDF", exact: true }).click();
+  await expect(page.getByLabel("Página atual")).toHaveValue("3");
+  await expect(page.getByRole("button", { name: "Aumentar zoom", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Ver citações", exact: true }).click();
+  await page.getByRole("button", { name: "Citação anterior", exact: true }).click();
+  await expect(page.getByRole("toolbar", { name: "Navegação das citações" })).toContainText("1 / 2 citações");
+  await page.getByRole("button", { name: "Configurações do PDF", exact: true }).click();
+  await expect(page.getByLabel("Página atual")).toHaveValue("1");
   await page.getByLabel("Fechar visualizador").click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
