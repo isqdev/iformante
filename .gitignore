@@ -18,9 +18,8 @@ back-end/scripts/*.md
 back-end/.uv-cache/
 front-end/test-results/
 front-end/playwright-report/
-# Downloaded Piper models and local voice verification artifacts
-back-end/voices/*.onnx
-back-end/voices/*.onnx.json
+# Downloaded voice models and local voice verification artifacts
+back-end/voices/pocket-tts/
 back-end/voices/*.wav
 back-end/voices/*.part
 # Local logs and design previews

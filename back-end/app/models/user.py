@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 class UserRole(str, Enum):
     COMMON = "COMMON"
     ADMIN = "ADMIN"
+    SUPER = "SUPER"
 
 
 class User(Base):

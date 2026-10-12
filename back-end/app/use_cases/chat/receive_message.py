@@ -1,3 +1,5 @@
+from app.prompts import PromptSnapshot
+from app.services.speech_text import SPEECH_MAX_WORDS
 import asyncio
 import logging
 from collections.abc import AsyncIterator
@@ -52,7 +54,9 @@ class ReceiveMessageUseCase:
         parent_retriever: ParentRetriever,
         message_source_repository: MessageSourceRepository,
         rag_retrieval_audit_repository: RagRetrievalAuditRepository,
+        prompts: PromptSnapshot | None = None,
     ) -> None:
+        self._prompts = prompts
         self._conversation_repository = conversation_repository
         self._message_repository = message_repository
         self._unit_of_work = unit_of_work
@@ -110,7 +114,7 @@ class ReceiveMessageUseCase:
             if route_result.direct_response is not None:
                 assistant_content = route_result.direct_response
                 if response_mode == ResponseMode.SPEECH:
-                    assistant_content = await self._answer_generator.prepare_direct_speech(assistant_content)
+                    assistant_content = await self._answer_generator.prepare_direct_speech(assistant_content, **({"system_prompt": self._prompts.voice_prompt(SPEECH_MAX_WORDS, direct=True)} if self._prompts else {}))
                 yield ChatStreamEvent(
                     "delta",
                     {"content": assistant_content},
@@ -132,11 +136,11 @@ class ReceiveMessageUseCase:
                 first_delta_received = False
                 async def answer_events():
                     if response_mode == ResponseMode.SPEECH:
-                        answer = await self._answer_generator.speech_answer(route_result.user_question, parents)
+                        answer = await self._answer_generator.speech_answer(route_result.user_question, parents, **({"system_prompt": self._prompts.voice_prompt(SPEECH_MAX_WORDS)} if self._prompts else {}))
                         yield AnswerDelta(answer.content)
                         yield answer
                     else:
-                        async for event in self._answer_generator.stream(route_result.user_question, parents):
+                        async for event in self._answer_generator.stream(route_result.user_question, parents, **({"system_prompt": self._prompts.replier} if self._prompts else {})):
                             yield event
 
                 async for answer_event in answer_events():
@@ -246,7 +250,7 @@ class ReceiveMessageUseCase:
     ):
         started_at = perf_counter()
         try:
-            return await self._question_router.execute(model_messages)
+            return await self._question_router.execute(model_messages, **({"system_prompt": self._prompts.router} if self._prompts else {}))
         finally:
             self._print_timing("router", started_at)
 

@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_database_session
 from app.models import User
+from app.security.roles import is_admin
 from app.models.auth import AuthSession
 from app.security.auth import CSRF_COOKIE, SESSION_COOKIE, now, token_hash
 
@@ -34,8 +35,14 @@ async def require_user(user: User | None = Depends(optional_current_user)) -> Us
 
 
 async def require_admin(user: User = Depends(require_user)) -> User:
-    if user.role != "ADMIN":
+    if not is_admin(user):
         raise HTTPException(403, "Acesso exclusivo para Admin.")
+    return user
+
+
+async def require_super(user: User = Depends(require_user)) -> User:
+    if user.role != "SUPER":
+        raise HTTPException(403, "Acesso exclusivo para SUPER.")
     return user
 
 

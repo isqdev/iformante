@@ -17,6 +17,8 @@ from app.repositories import (
     RagRetrievalAuditRepository,
 )
 from app.repositories import UnitOfWork
+from app.repositories.system_param_repository import SystemParamRepository
+from app.security.auth import AuthError
 from app.rag.generation import AnswerGenerator, QuestionRouter
 from app.rag.retrieval import ParentRetriever
 from app.use_cases.conversations import GetConversationUseCase, ListConversationsUseCase
@@ -40,7 +42,7 @@ def get_get_conversation_use_case(
     )
 
 
-def get_receive_message_use_case(
+async def get_receive_message_use_case(
     session: Annotated[AsyncSession, Depends(get_database_session)],
     route_use_case: Annotated[
         QuestionRouter,
@@ -51,6 +53,10 @@ def get_receive_message_use_case(
         Depends(get_answer_generator),
     ],
 ) -> ReceiveMessageUseCase:
+    try:
+        prompts = await SystemParamRepository(session).snapshot()
+    except (KeyError, ValueError) as error:
+        raise AuthError("Prompts do sistema não configurados. Aplique a migração do banco.", 503) from error
     return ReceiveMessageUseCase(
         conversation_repository=ConversationRepository(session),
         message_repository=MessageRepository(session),
@@ -64,7 +70,9 @@ def get_receive_message_use_case(
             RagRepository(session),
             settings.rag_reranker_model,
             settings.rag_candidate_count,
+            prompts.reranker,
         ),
         message_source_repository=MessageSourceRepository(session),
         rag_retrieval_audit_repository=RagRetrievalAuditRepository(session),
+        prompts=prompts,
     )

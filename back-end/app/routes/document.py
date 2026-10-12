@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.models import User
+from app.security.roles import is_admin
 from app.security.dependencies import require_admin, optional_current_user
 from app.db import get_database_session
 from app.factories.documents import (
@@ -41,7 +42,7 @@ async def get_document_content(
 ) -> FileResponse | StreamingResponse:
     document = await DocumentRepository(session).get_by_id(document_id)
 
-    if document is None or not document.stored_path or (document.ingestion_status != "INDEXED" and (not user or user.role != "ADMIN")):
+    if document is None or not document.stored_path or (document.ingestion_status != "INDEXED" and not is_admin(user)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento nao encontrado.")
 
     storage_root = Path(settings.document_storage_dir).resolve()
@@ -74,8 +75,8 @@ async def list_documents(
         Depends(get_list_documents_use_case),
     ],
 ) -> list[dict]:
-    documents = await use_case.execute(public=not user or user.role != "ADMIN")
-    if user and user.role == "ADMIN":
+    documents = await use_case.execute(public=not is_admin(user))
+    if is_admin(user):
         return [DocumentResponse(id=d.id, name=d.title, url=d.source_url, source_type=d.source_type, status=d.ingestion_status, uploaded_by_name=d.uploaded_by_user.name.split(maxsplit=1)[0]).model_dump() for d in documents]
     return [{"id": d.id, "name": d.title, "url": d.source_url, "source_type": d.source_type} for d in documents if d.ingestion_status == "INDEXED"]
 

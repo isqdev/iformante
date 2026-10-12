@@ -7,67 +7,11 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
 from app.rag.retrieval import RetrievedParent
-from app.services.speech_text import SPEECH_FALLBACK, SPEECH_MAX_WORDS, normalize_speech, within_speech_budget
+from app.prompts import DEFAULT_PROMPTS, PROMPT_DEFAULTS
+from app.services.speech_text import SPEECH_MAX_WORDS, normalize_speech
 
 
-SYSTEM_PROMPT = """Você é um assistente acadêmico do IFPR Campus Paranavaí.
-
-Sua missão é tirar dúvidas de estudantes, professores e funcionários do IFPR
-Paranavaí usando exclusivamente informações contidas nas fontes fornecidas,
-identificadas por [parent_N].
-
-## Escopo geográfico
-
-Você representa EXCLUSIVAMENTE o Campus Paranavaí.
-Mesmo que as fontes contenham informações de outros campi do IFPR, ignore-as
-completamente.
-Se houver menção a outros campus, considere apenas trechos que se refiram explicitamente a Paranavaí ou normas gerais
-aplicáveis a todos os campi sem distinção de localidade.
-Se a pergunta for sobre outro campus, responda exatamente: "Não posso ajudar com isso."
-
-## Regras de resposta
-
-- Use exclusivamente as fontes fornecidas. Não use conhecimento externo.
-- Suas respostas devem ser sempre completas, incluindo TODOS os dados pertinentes
-  presentes nas fontes.
-- Sempre inclua informações relevantes para a pergunta, mesmo que não tenham sido
-  explicitamente solicitadas, desde que ajudem a esclarecer o contexto da resposta.
-- Quando a pergunta envolver um valor que seja resultado de uma soma, total ou
-  subtotal presente em uma tabela ou estrutura hierárquica (ex: carga horária total
-  composta por obrigatórias, optativas, estágio, atividades complementares, extensão),
-  não responda apenas com o valor final — apresente também a composição/breakdown
-  completo que forma esse valor, para que o usuário entenda de onde ele vem.
-- Quando faltar uma informação solicitada, diga brevemente no próprio texto o
-  que não foi encontrado, sem criar uma seção de "Limitações" ou equivalente e
-  sem discorrer sobre as lacunas.
-- Nesses casos, encerre o texto visível com uma única pergunta específica de
-  continuidade, que possa ser respondida apenas com "sim" ou "não". Prefira até
-  10 palavras e nunca ultrapasse 15 palavras nessa pergunta. Proponha
-  buscar ou esclarecer um ponto concreto relacionado à informação que faltou,
-  explicitando o assunto sem repetir o contexto já estabelecido na resposta.
-  Exemplo: "Não encontrei o prazo de inscrição para esse auxílio. Quer que eu
-  busque orientações de inscrição no auxílio estudantil?"
-- Não use perguntas genéricas como "Quer saber mais?", não peça vários dados
-  nessa pergunta e não prometa que a informação será encontrada. Ofereça apenas
-  continuidade dentro do escopo de consulta de informações do Campus Paranavaí.
-- Se a pergunta estiver completamente respondida, não invente lacunas nem force
-  uma pergunta de continuidade. Nas recusas por escopo, mantenha a resposta exata.
-- Não invente informações para preencher lacunas.
-- Se responder com dados estruturados, use tabela Markdown.
-- Não mencione fontes, documentos, URLs ou páginas no texto da resposta.
-- Se a pergunta estiver fora do escopo, responda exatamente: "Não posso ajudar com isso."
-- Priorize tabelas para dados estruturados.
-- Utilize Headers markdown (#) para organizar as respostas para facilitar a leitura.
-- Toda sentença deve começar com letra maiúscula.
-- Não comece a resposta com um header.
-
-## Formato de saída
-
-Ao final da resposta, retorne um bloco JSON delimitado por ```json e ``` contendo
-APENAS os labels das fontes que de fato utilizou:
-{"used_sources": ["parent_1"]}
-Se nenhuma fonte foi suficiente, use {"used_sources": []} e informe isso no texto.
-"""
+SYSTEM_PROMPT = PROMPT_DEFAULTS["prompt_replier"]
 
 
 @dataclass(frozen=True)
@@ -94,45 +38,32 @@ class AnswerGenerator:
     def warm_up(self) -> None:
         self._get_chat_model()
 
-    async def speech_answer(self, question: str, parents: list[RetrievedParent]) -> AnswerResult:
-        """A separate presentation policy preserves grounding without text-chat formatting."""
+    async def speech_answer(self, question: str, parents: list[RetrievedParent], *, system_prompt: str | None = None) -> AnswerResult:
         labels = {f"parent_{i}": p.id for i, p in enumerate(parents, 1)}
         context = "\n\n".join(f"[{label}]\n{p.content}" for label, p in zip(labels, parents, strict=True))
-        common = SYSTEM_PROMPT.split("## Regras de resposta")[0]
-        prompt = common + f"""\nVocê está respondendo em uma chamada de voz. Essa modalidade é determinada pelo servidor.
-Use apenas as fontes e nunca invente informações. Responda a pergunta em até {SPEECH_MAX_WORDS} palavras,
-preferindo até 30 para acomodar números e datas por extenso. Priorize o dado pedido e ressalvas essenciais.
-Use frases curtas em português brasileiro, adequadas à leitura, sem tabelas, títulos, Markdown ou URLs.
-Se faltar informação, diga isso brevemente. Se precisar, faça uma pergunta específica de continuidade.
-Para outro campus ou fora do escopo, responda exatamente: Não posso ajudar com isso.
-Ao final, inclua um bloco JSON entre ```json e ``` com {{"used_sources": ["parent_1"]}},
-com apenas os labels usados. Os metadados não fazem parte da fala nem do limite de palavras.
-"""
-        messages = [SystemMessage(content=prompt), HumanMessage(content=f"FONTES:\n{context}\n\nPERGUNTA:\n{question}")]
-        for attempt in range(2):
-            response = await self._get_chat_model().ainvoke(messages)
-            content, used = self._extract_sources(self._text(response.content))
-            spoken = normalize_speech(content)
-            if within_speech_budget(spoken):
-                return AnswerResult(spoken, [labels[label] for label in used if label in labels])
-            messages.append(HumanMessage(content=f"A versão anterior excedeu o limite após preparar a leitura. Reescreva em até 25 palavras, preservando os dados da pergunta e os labels corretos. Versão anterior: {spoken}"))
-        return AnswerResult(SPEECH_FALLBACK, [])
+        messages = [
+            SystemMessage(content=system_prompt if system_prompt is not None else DEFAULT_PROMPTS.voice_prompt(SPEECH_MAX_WORDS)),
+            HumanMessage(content=f"FONTES:\n{context}\n\nPERGUNTA:\n{question}"),
+        ]
+        response = await self._get_chat_model().ainvoke(messages)
+        content, used = self._extract_sources(self._text(response.content))
+        return AnswerResult(normalize_speech(content), [labels[label] for label in used if label in labels])
 
-    async def prepare_direct_speech(self, text: str) -> str:
+    async def prepare_direct_speech(self, text: str, *, system_prompt: str | None = None) -> str:
         spoken = normalize_speech(text)
-        if within_speech_budget(spoken):
+        if spoken == "Não posso ajudar com isso.":
             return spoken
         response = await self._get_chat_model().ainvoke([
-            SystemMessage(content="Reescreva a mensagem em português oral em até 25 palavras. Preserve seu significado, sem adicionar fatos, números, URLs ou Markdown. Retorne apenas a mensagem."),
-            HumanMessage(content=spoken),
+            SystemMessage(content=system_prompt if system_prompt is not None else DEFAULT_PROMPTS.voice_prompt(SPEECH_MAX_WORDS, direct=True)),
+            HumanMessage(content=text),
         ])
-        spoken = normalize_speech(self._text(response.content))
-        return spoken if within_speech_budget(spoken) else SPEECH_FALLBACK
+        return normalize_speech(self._text(response.content))
 
     async def stream(
         self,
         question: str,
         parents: list[RetrievedParent],
+        *, system_prompt: str = SYSTEM_PROMPT,
     ) -> AsyncIterator[AnswerDelta | AnswerResult]:
         if not self._api_key:
             raise RuntimeError("OPENAI_API_KEY nao configurada no back-end.")
@@ -146,7 +77,7 @@ com apenas os labels usados. Os metadados não fazem parte da fala nem do limite
             for label, parent in zip(labels, parents, strict=True)
         )
         messages = [
-            SystemMessage(content=SYSTEM_PROMPT),
+            SystemMessage(content=system_prompt),
             HumanMessage(content=f"FONTES:\n{context}\n\nPERGUNTA:\n{question}"),
         ]
         marker = "```json"

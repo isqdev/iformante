@@ -7,7 +7,6 @@ from pathlib import Path
 
 import httpx
 
-from app.services.speech_text import within_speech_budget
 
 logger = logging.getLogger(__name__)
 MAX_AUDIO_BYTES = 10 * 1024 * 1024
@@ -57,41 +56,43 @@ class GroqTranscriber:
         return text
 
 
-def _piper_worker(connection, model_path: str):
-    """One loaded voice per worker. Terminating a worker also stops ONNX inference."""
+def _stream_pocket_tts(connection, model, voice_state, text: str):
+    import numpy as np
+
+    offset = 0
+    sequence = 0
+    rate = model.sample_rate
+    connection.send(("audio_format", {"sample_rate": rate, "channels": 1, "sample_width": 2}))
+    for chunk in model.generate_audio_stream(voice_state, text, copy_state=True):
+        samples = chunk.detach().cpu().numpy().reshape(-1)
+        # The model returns float samples; the browser consumes little-endian PCM16.
+        raw = (np.clip(samples, -1, 1) * 32767).astype("<i2").tobytes()
+        frame_bytes = max(2, int(rate * 0.1) * 2)
+        for start in range(0, len(raw), frame_bytes):
+            frame = raw[start:start + frame_bytes]
+            connection.send(("audio", {"sequence": sequence, "data": base64.b64encode(frame).decode("ascii")}))
+            sequence += 1
+        offset += len(raw) // 2
+    connection.send(("audio_done", {"samples": offset}))
+
+
+def _pocket_tts_worker(connection, config_path: str, voice_path: str):
+    """Keep the model and George's state loaded; termination stops CPU inference."""
     try:
-        from piper import PiperVoice
-        voice = PiperVoice.load(model_path, include_alignments=True)
+        from pocket_tts import TTSModel
+
+        model = TTSModel.load_model(config=Path(config_path))
+        voice_state = model.get_state_for_audio_prompt(Path(voice_path))
         connection.send(("ready", {}))
         while True:
             text = connection.recv()
             if text is None:
                 return
-            offset = 0
-            sequence = 0
-            for chunk in voice.synthesize(text, include_alignments=True):
-                rate = chunk.sample_rate
-                connection.send(("audio_format", {"sample_rate": rate, "channels": chunk.sample_channels, "sample_width": chunk.sample_width}))
-                alignments = []
-                cursor = offset
-                for alignment in chunk.phoneme_alignments or []:
-                    alignments.append({"phoneme": alignment.phoneme, "start": cursor / rate, "duration": alignment.num_samples / rate})
-                    cursor += alignment.num_samples
-                if alignments:
-                    connection.send(("alignment", {"items": alignments}))
-                raw = chunk.audio_int16_bytes
-                # Small transport frames provide backpressure and responsive interruption.
-                frame_bytes = max(2, int(rate * 0.1) * 2)
-                for start in range(0, len(raw), frame_bytes):
-                    frame = raw[start:start + frame_bytes]
-                    connection.send(("audio", {"sequence": sequence, "data": base64.b64encode(frame).decode("ascii")}))
-                    sequence += 1
-                offset += len(raw) // 2
-            connection.send(("audio_done", {"samples": offset}))
+            _stream_pocket_tts(connection, model, voice_state, text)
     except (EOFError, BrokenPipeError):
         pass
     except Exception:
-        logger.exception("call.piper_worker_failed")
+        logger.exception("call.pocket_tts_worker_failed")
         try:
             connection.send(("error", {"message": "Não foi possível gerar a voz do InFormante."}))
         except (EOFError, BrokenPipeError):
@@ -100,9 +101,11 @@ def _piper_worker(connection, model_path: str):
         connection.close()
 
 
-class PiperService:
-    def __init__(self, model_path: str):
-        self.model_path = model_path
+class PocketTTSService:
+    def __init__(self, config_path: str, voice_path: str):
+        root = Path(__file__).resolve().parents[2]
+        self.config_path = str(root / config_path)
+        self.voice_path = str(root / voice_path)
         self._lock = asyncio.Lock()
         self._process = None
         self._connection = None
@@ -110,14 +113,19 @@ class PiperService:
 
     @property
     def configured(self) -> bool:
-        return Path(self.model_path).is_file() and Path(f"{self.model_path}.json").is_file()
+        folder = Path(self.config_path).parent
+        return all(path.is_file() for path in (
+            Path(self.config_path), Path(self.voice_path),
+            folder / "model.safetensors", folder / "tokenizer.json",
+        ))
 
     def _start(self):
         if not self.configured:
             raise RuntimeError("A voz do InFormante ainda não foi instalada no servidor.")
         context = mp.get_context("spawn")
         parent, child = context.Pipe()
-        self._process = context.Process(target=_piper_worker, args=(child, self.model_path), daemon=True)
+        self._process = context.Process(target=_pocket_tts_worker,
+                                        args=(child, self.config_path, self.voice_path), daemon=True)
         self._process.start()
         child.close()
         self._connection = parent
@@ -143,8 +151,6 @@ class PiperService:
             self._ready = True
 
     async def stream(self, text: str) -> AsyncIterator[tuple[str, dict]]:
-        if not within_speech_budget(text):
-            raise ValueError("A resposta excedeu o limite de palavras para a chamada.")
         completed = False
         async with self._lock:
             try:

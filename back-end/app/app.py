@@ -11,7 +11,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 from app.routes.auth import router as auth_router
-from app.routes.call import router as call_router, piper_service
+from app.routes.system import router as system_router
+from app.routes.call import router as call_router, voice_service
 from app.security.auth import AuthError
 from app.services.auth_mail import mail_worker, smtp_ready
 from app.db.postgres import async_session
@@ -40,7 +41,7 @@ async def lifespan(app: FastAPI):
         logger.info("chat.warmup_skipped=missing_openai_config")
 
     worker = asyncio.create_task(mail_worker(async_session)) if smtp_ready() and async_session else None
-    voice_worker = asyncio.create_task(piper_service.warm_up()) if piper_service.configured else None
+    voice_worker = asyncio.create_task(voice_service.warm_up()) if voice_service.configured else None
     if voice_worker:
         def log_voice_result(task):
             if not task.cancelled() and task.exception():
@@ -51,7 +52,7 @@ async def lifespan(app: FastAPI):
         voice_worker.cancel()
         with suppress(asyncio.CancelledError):
             await voice_worker
-    await piper_service.close()
+    await voice_service.close()
     if worker:
         worker.cancel()
         with suppress(asyncio.CancelledError):
@@ -74,6 +75,7 @@ app.include_router(conversation_router)
 app.include_router(document_router)
 app.include_router(auth_router)
 app.include_router(call_router)
+app.include_router(system_router)
 
 
 @app.exception_handler(AuthError)

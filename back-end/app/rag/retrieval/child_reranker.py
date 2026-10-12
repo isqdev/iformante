@@ -7,19 +7,9 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
 
-SYSTEM_PROMPT = """Você é um reranker de trechos para um sistema RAG.
+from app.prompts import PROMPT_DEFAULTS
 
-Ordene todos os trechos recebidos do mais relevante ao menos relevante para
-responder à pergunta. Considere cobertura factual, relação direta com a pergunta
-e presença de detalhes necessários para uma resposta completa.
-
-Retorne somente um array JSON com todos os pseudo-IDs, na ordem escolhida.
-Não retorne objeto, explicação, Markdown ou texto adicional.
-
-- Se houver menção a outros campos, lembre-se que você representa apenas o Campus IFPR Paranavaí
-
-Exemplo: ["child_3", "child_1", "child_2"]
-"""
+SYSTEM_PROMPT = PROMPT_DEFAULTS["prompt_reranker"]
 
 
 @dataclass(frozen=True)
@@ -29,7 +19,8 @@ class RerankCandidate:
 
 
 class ChildReranker:
-    def __init__(self, api_key: str, model: str = "gpt-5-nano") -> None:
+    def __init__(self, api_key: str, model: str = "gpt-5-nano", *, system_prompt: str = SYSTEM_PROMPT) -> None:
+        self._system_prompt = system_prompt
         model_options: dict[str, Any] = {}
         if model.startswith("gpt-5"):
             model_options["reasoning_effort"] = "minimal"
@@ -54,7 +45,7 @@ class ChildReranker:
             )
             response = await self._model.ainvoke(
                 [
-                    SystemMessage(content=SYSTEM_PROMPT),
+                    SystemMessage(content=self._system_prompt),
                     HumanMessage(
                         content=f"PERGUNTA:\n{query}\n\nTRECHOS:\n{content}",
                     ),

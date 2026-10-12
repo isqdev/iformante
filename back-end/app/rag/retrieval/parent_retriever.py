@@ -6,6 +6,7 @@ from langchain_openai import OpenAIEmbeddings
 from app.models import RagDocumentParent
 from app.repositories import RagRepository
 
+from app.prompts import PROMPT_DEFAULTS
 from .child_reranker import ChildReranker, RerankCandidate
 
 
@@ -45,6 +46,7 @@ class ParentRetriever:
         repository: RagRepository,
         reranker_model: str = "gpt-5-nano",
         candidate_count: int = 32,
+        reranker_prompt: str = PROMPT_DEFAULTS["prompt_reranker"],
     ) -> None:
         if not api_key:
             raise RuntimeError("OPENAI_API_KEY nao configurada no back-end.")
@@ -58,7 +60,7 @@ class ParentRetriever:
         )
         self._top_k = top_k
         self._repository = repository
-        self._reranker = ChildReranker(api_key, reranker_model)
+        self._reranker = ChildReranker(api_key, reranker_model, system_prompt=reranker_prompt)
         self._candidate_count = candidate_count
 
     async def retrieve(self, query: str) -> ParentRetrievalResult:

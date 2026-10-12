@@ -17,13 +17,13 @@ from app.models import User
 from app.rag.models import ModelMessage
 from app.routes.chat import format_sse
 from app.security.dependencies import optional_current_user
-from app.services.call_audio import GroqTranscriber, MAX_AUDIO_BYTES, PiperService, audio_extension
+from app.services.call_audio import GroqTranscriber, MAX_AUDIO_BYTES, PocketTTSService, audio_extension
 from app.services.speech_text import ResponseMode
 from app.use_cases.chat import ReceiveMessageUseCase
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/call", tags=["call"])
-piper_service = PiperService(settings.piper_model_path)
+voice_service = PocketTTSService(settings.pocket_tts_config_path, settings.pocket_tts_voice_path)
 
 
 @dataclass
@@ -48,8 +48,8 @@ class PlaybackRequest(BaseModel):
 
 @router.get("/status")
 async def call_status():
-    return {"ready": bool(settings.groq_api_key) and bool(settings.openai_api_key) and piper_service.configured,
-            "transcription_ready": bool(settings.groq_api_key), "voice_ready": piper_service.configured,
+    return {"ready": bool(settings.groq_api_key) and bool(settings.openai_api_key) and voice_service.configured,
+            "transcription_ready": bool(settings.groq_api_key), "voice_ready": voice_service.configured,
             "answer_ready": bool(settings.openai_api_key)}
 
 
@@ -83,7 +83,7 @@ async def call_stream(
         raise HTTPException(400, "Identificador de chamada inválido.")
     if turn_id in active_turns or len(active_turns) >= 8:
         raise HTTPException(429, "A chamada está ocupada. Tente novamente em instantes.")
-    if not (settings.groq_api_key and piper_service.configured and use_case.is_configured):
+    if not (settings.groq_api_key and voice_service.configured and use_case.is_configured):
         raise HTTPException(503, "A chamada ainda não está configurada no servidor.")
     if len(messages) > 100_000:
         raise HTTPException(400, "Histórico muito grande.")
@@ -140,7 +140,7 @@ async def call_stream(
                 raise RuntimeError("Não foi possível finalizar a resposta.")
             yield format_sse("answer", {"text": answer, **done})
             yield format_sse("state", {"value": "speaking"})
-            async for event, payload in piper_service.stream(answer):
+            async for event, payload in voice_service.stream(answer):
                 yield format_sse(event, payload)
             yield format_sse("done", done)
         except asyncio.CancelledError:

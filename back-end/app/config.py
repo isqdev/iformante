@@ -29,7 +29,8 @@ class Settings:
 
     document_remote_base_url: str | None = None
     groq_api_key: str | None = None
-    piper_model_path: str = "voices/pt_BR-faber-medium.onnx"
+    pocket_tts_config_path: str = "voices/pocket-tts/portuguese.yaml"
+    pocket_tts_voice_path: str = "voices/pocket-tts/george.safetensors"
 
     @staticmethod
     def from_env() -> "Settings":
@@ -55,7 +56,8 @@ class Settings:
             document_storage_dir=os.getenv("DOCUMENT_STORAGE_DIR", "downloads"),
             document_remote_base_url=os.getenv("DOCUMENT_REMOTE_BASE_URL") or None,
             groq_api_key=os.getenv("GROQ_API_KEY") or None,
-            piper_model_path=os.getenv("PIPER_MODEL_PATH", "voices/pt_BR-faber-medium.onnx"),
+            pocket_tts_config_path=os.getenv("POCKET_TTS_CONFIG_PATH", "voices/pocket-tts/portuguese.yaml"),
+            pocket_tts_voice_path=os.getenv("POCKET_TTS_VOICE_PATH", "voices/pocket-tts/george.safetensors"),
         )
 
     @staticmethod
