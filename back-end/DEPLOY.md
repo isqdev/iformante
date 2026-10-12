@@ -27,10 +27,12 @@ Mantenha os PDFs originais em armazenamento persistente e configure
    uv run alembic upgrade head
    ```
 
-3. O Dockerfile instala automaticamente a voz `pt_BR-faber-medium`. Se não
+3. O Dockerfile instala automaticamente o Pocket TTS para português com George. Se não
    usar Docker, execute `uv run python scripts/install_call_voice.py`.
-   Os arquivos ONNX e JSON são baixados e verificados pelo script, sem
-   necessidade de enviá-los ao Git. Consulte `voices/NOTICE.md`.
+   Os pesos, o tokenizador e o estado da voz são baixados de uma revisão fixa
+   e verificados com SHA-256. A configuração usa arquivos locais; os pesos públicos
+   não exigem token Hugging Face. PyTorch é instalado para CPU, inclusive na
+   imagem Linux. Não envie os modelos ao Git. Consulte `voices/NOTICE.md`.
 4. Inicie a API com um processo e uma réplica para que a síntese e o
    cancelamento de chamadas compartilhem o mesmo estado:
 

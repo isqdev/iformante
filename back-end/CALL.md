@@ -26,11 +26,19 @@ uv run alembic upgrade head
 ```
 
 Set `GROQ_API_KEY` and the existing `OPENAI_API_KEY` in the server environment.
-The default `PIPER_MODEL_PATH` is `voices/pt_BR-faber-medium.onnx`. Its adjacent
-`.onnx.json` is also required. The Docker build downloads and verifies both files.
-The installed voice is Brazilian Portuguese, medium quality, 22,050 Hz. The
-download is pinned to revision `2f8dbe0`, with checksums verified before replacing
-local files. Attribution and license information are in `voices/NOTICE.md`.
+The defaults are `POCKET_TTS_CONFIG_PATH=voices/pocket-tts/portuguese.yaml` and
+`POCKET_TTS_VOICE_PATH=voices/pocket-tts/george.safetensors`. The runtime is
+Kyutai Pocket TTS 3.3.0 with its Portuguese model and George's matching voice
+state. Portuguese text and Brazilian speech normalization are preserved.
+George's original reference recording is English, so an accent can remain.
+The installer downloads the public model, tokenizer and Portuguese George state
+from `kyutai/pocket-tts-without-voice-cloning`, revision
+`575d14372df89a4534bcb989870a34e77544b09f`, verifying SHA-256 before replacing
+files. It writes the Portuguese architecture config with local paths, so runtime
+synthesis needs no network downloads, Hugging Face token or gated model access.
+Audio is mono PCM16 at 24,000 Hz. PyTorch uses its CPU distribution.
+The Docker build runs the same installer. Relative configuration and voice paths
+resolve from `back-end`. Attribution and licenses are in `voices/NOTICE.md`.
 
 ## Response and audio policy
 
@@ -39,16 +47,28 @@ sets `ResponseMode.SPEECH`. Clients and model outputs cannot select this mode.
 The same router and retrieval are reused, with a separate speech presentation
 prompt. Direct router responses also pass through speech preparation.
 
-Before Piper, numbers, dates, currencies and supported abbreviations are prepared
-for reading. The server enforces 40 words on the resulting string, allowing one
-shortening attempt and a safe short fallback. Source labels are separate metadata.
-There is no 20-second playback timer or automatic audio cutoff. A local sample of
-40 words took 15.06 seconds; duration varies with pauses and pronunciation.
+Before synthesis, numbers, dates, currencies and supported abbreviations are prepared
+for reading. The prompt suggests 60 words, but the server does not reject,
+rewrite, truncate or replace an answer that exceeds that suggestion. Each speech
+generation/adaptation calls the model once, without application retries or a
+word-budget fallback. Explanations normally aim for
+40-55 spoken words when needed; greetings and simple answers stay brief.
+Responses start with the answer, without repeating or paraphrasing the question.
+Complete, connected sentences replace headings, lists, labels and parenthetical
+asides. Written structures and question-echo introductions do not trigger another
+generation. Direct router responses receive the same oral style;
+the exact scope refusal remains unchanged. Dates use a natural first-day form,
+singular times agree correctly, and paragraph boundaries preserve sentence pauses.
+Source labels are separate metadata.
+There is no 20-second playback timer or automatic audio cutoff. Duration varies
+with pauses, voice and pronunciation.
 
-The voice worker loads the model once and keeps it between turns. It uses phoneme
-alignment to animate the mouth, with an amplitude fallback when alignment is
-unavailable. Cancelling a synthesis terminates the worker; the next turn starts a
-fresh worker. Audio is returned progressively after response validation. The
+The voice worker keeps the model and George's voice state loaded between turns.
+Each turn uses a copy of that state to avoid carrying generated speech into the
+next response. Pocket TTS does not supply phoneme timings, so the mouth follows
+the amplitude of the audio actually being played. Cancelling a synthesis
+terminates the worker; the next turn starts a fresh worker. Audio is returned
+progressively by `generate_audio_stream` after response validation. The
 browser uses an AudioWorklet, PCM queue and resampling; its consumed audio clock
 drives the mouth. Transmission completion and playback completion are separate.
 
@@ -71,8 +91,9 @@ marked locally so subsequent turns do not assume they were fully heard.
   `saved: false` without database writes. Current clients track playback locally.
 
 SSE events: `state`, `transcript`, `rag`, `answer`, `audio_format`,
-`alignment`, `audio`, `audio_done`, `done`, `error`. Audio is mono PCM16 in base64,
-with ordered frame sequences; phoneme timings are relative to the audio stream.
+`audio`, `audio_done`, `done`, `error`. Audio is mono PCM16 in base64,
+with ordered frame sequences. The browser also accepts optional `alignment`
+events for compatibility; the current engine does not emit them.
 The Next proxy preserves response streaming. Keys remain only on the back-end.
 
 The first version supports one synthesis worker per API process and at most eight
@@ -82,12 +103,25 @@ routing; the current in-memory registry must not be advertised as distributed.
 
 ## Verification
 
-Local validation on 2026-10-11: 15 call back-end tests, 2 current chat streaming
-regression tests and 14 Chromium browser scenarios passed (with targeted reruns), including automatic
-page entry, microphone denial/retry, temporary signed-in context, fullscreen
-PDF sources and gesture-gated audio playback. TypeScript checking
-and ESLint passed. Desktop and mobile screenshots were inspected. Piper's local
-worker test confirmed alignment, model reuse, cancellation and restart.
+Voice presentation update on 2026-10-12: 30 call tests and the two current
+answer/router streaming regressions passed. The three HTTP chat-route tests
+also passed; five older tests in the same file still use outdated interfaces,
+as noted below. Real local synthesis with George completed a 60-word response
+in 24.4 seconds, with ordered PCM frames and no playback cutoff. The 40-word
+sample took 16.48 seconds in the same run. Word count includes expanded numbers
+and dates. Comparing actual model-generated phrasing against the old policy
+requires explicit approval to send the selected project excerpts to OpenAI.
+
+Validation on 2026-10-11: 18 call back-end tests, two current chat regressions
+and three Chromium playback/control scenarios passed. Browser tests use 24 kHz
+audio without phoneme timings. Real offline synthesis with George confirmed
+PCM format, ordered frames, sample totals, worker reuse, termination and restart.
+The 40-word sample took 16.56 seconds; the normalized dates/numbers sample took
+11.52 seconds. External Groq/OpenAI calls were mocked in the regression tests.
+
+The commands below verify the current engine. Local regression tests mock
+external Groq/OpenAI calls. The local voice smoke test uses the installed
+Portuguese model with George, including model reuse, cancellation and restart.
 
 ```powershell
 uv run python -m unittest discover -s tests -p test_call.py -v
@@ -104,7 +138,8 @@ npx tsc --noEmit
 npm run lint -- --quiet
 ```
 
-The local smoke script verifies synthesis, alignment, worker reuse and actual
+The local smoke script verifies Brazilian synthesis, PCM format, ordered frames,
+sample totals, worker reuse and actual
 termination/restart. Its optional `--api-url http://127.0.0.1:8000` sends a synthetic
 academic question through the complete external Groq/OpenAI flow and must only be
 run with authorization for that external test. Local regression tests use
